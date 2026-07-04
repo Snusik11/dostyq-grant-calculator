@@ -17,15 +17,16 @@
     <div class="site-header-inner">
       <a href="#/" class="logo"><img src="assets/logo.webp" alt="Dostyq Online" /></a>
       <nav class="site-nav">
-        <a href="#/" data-route="calculator">Калькулятор</a>
-        <a href="#/specialties" data-route="specialties">Специальности</a>
-        <a href="#/universities" data-route="universities">Вузы</a>
+        <a href="#/" data-route="calculator" data-i18n="nav.calculator">Калькулятор</a>
+        <a href="#/specialties" data-route="specialties" data-i18n="nav.specialties">Специальности</a>
+        <a href="#/universities" data-route="universities" data-i18n="nav.universities">Вузы</a>
+        <button id="lang-toggle" class="lang-toggle" type="button" aria-label="Тілді ауыстыру / Переключить язык">ҚАЗ</button>
         <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Переключить тему" title="Светлая/тёмная тема"></button>
       </nav>
     </div>
   </header>
   <main class="container" id="app"></main>
-  <footer class="site-footer">
+  <footer class="site-footer" data-i18n="footer.disclaimer">
     Данные: официальный список обладателей грантов 2023–2025 годов, приказы о распределении грантов 2024–2027,
     testcenter.kz, eduser.app. Оценки — эвристика на основе тренда прошлых лет, не гарантия поступления.
   </footer>

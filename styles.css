@@ -126,6 +126,21 @@ nav.site-nav a.active, nav.site-nav a:hover { color: var(--brand); }
 .theme-toggle:hover { border-color: var(--brand); color: var(--brand); }
 .theme-toggle:focus-visible { outline: 3px solid var(--brand-light); outline-offset: 2px; }
 
+.lang-toggle {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.lang-toggle:hover { border-color: var(--brand); color: var(--brand); }
+.lang-toggle:focus-visible { outline: 3px solid var(--brand-light); outline-offset: 2px; }
+
 h1 { font-size: 1.6rem; margin: 32px 0 8px; }
 h2 { font-size: 1.2rem; margin: 28px 0 12px; }
 p.lede { color: var(--text-muted); margin-top: 0; }
