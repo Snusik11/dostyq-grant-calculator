@@ -13,6 +13,10 @@
   --medium-bg: #fbf1dc;
   --low: #c23b3b;
   --low-bg: #fbe9e9;
+  --quota-general: #3a5fc4;
+  --quota-general-bg: #e9edfb;
+  --quota-rural: #0e7c86;
+  --quota-rural-bg: #e2f4f5;
   --radius: 12px;
   --shadow: 0 1px 3px rgba(30, 15, 25, 0.08), 0 8px 24px rgba(30, 15, 25, 0.06);
 }
@@ -33,6 +37,10 @@
   --medium-bg: #362a10;
   --low: #f08080;
   --low-bg: #3a1a1a;
+  --quota-general: #8ca6f0;
+  --quota-general-bg: #1e2740;
+  --quota-rural: #5fd0da;
+  --quota-rural-bg: #123236;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
@@ -268,7 +276,12 @@ button.primary:focus-visible { outline: 3px solid var(--brand-light); outline-of
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.9rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
 }
+.select-filter-option .code { color: var(--text-muted); font-size: 0.8rem; white-space: nowrap; }
 .select-filter-option:hover { background: var(--bg-soft); }
 .select-filter-option.active { background: var(--brand-light); color: var(--brand-dark); font-weight: 600; }
 .dropdown-empty { padding: 10px; color: var(--text-muted); font-size: 0.85rem; }
@@ -309,6 +322,19 @@ button.primary:focus-visible { outline: 3px solid var(--brand-light); outline-of
 .badge.high { background: var(--high-bg); color: var(--high); }
 .badge.medium { background: var(--medium-bg); color: var(--medium); }
 .badge.low { background: var(--low-bg); color: var(--low); }
+
+.path-badges { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.badge-quota {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.badge-quota.general { background: var(--quota-general-bg); color: var(--quota-general); }
+.badge-quota.rural { background: var(--quota-rural-bg); color: var(--quota-rural); }
 
 .badge-note {
   display: inline-block;

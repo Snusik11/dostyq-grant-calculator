@@ -74,11 +74,15 @@ function createSearchableSelect(mount, { allLabel, options, onChange }) {
 
   function renderOptions(filterText) {
     const ft = filterText.trim().toLowerCase();
-    const filtered = ft ? options.filter((o) => o.label.toLowerCase().includes(ft)) : options;
+    // Ищем и по названию, и по коду (o.value) — код может не входить в
+    // видимый label (например, у вузов код не дублируется в тексте).
+    const filtered = ft
+      ? options.filter((o) => o.label.toLowerCase().includes(ft) || o.value.toLowerCase().includes(ft))
+      : options;
     const allRow = `<div class="select-filter-option${selectedValue === "" ? " active" : ""}" data-value="">${escapeHtml(allLabel)}</div>`;
     const rows = filtered.map((o) => `
       <div class="select-filter-option${selectedValue === o.value ? " active" : ""}" data-value="${escapeHtml(o.value)}">
-        ${escapeHtml(o.label)}
+        <span>${escapeHtml(o.label)}</span>${o.showCode ? `<span class="code">${escapeHtml(o.value)}</span>` : ""}
       </div>
     `).join("");
     optionsEl.innerHTML = allRow + (rows || `<div class="dropdown-empty">Ничего не найдено</div>`);
@@ -300,7 +304,7 @@ function renderResults(container, { comboKey, score, rural, otherQuotas }) {
   // не текстовый поиск: выбор одного варианта СУЖАЕТ список ровно до него,
   // как в обычном фильтре на любом каталожном сайте.
   const universityOptions = [...new Map(
-    scored.map((r) => [r.university_code, { value: r.university_code, label: r.university_name }])
+    scored.map((r) => [r.university_code, { value: r.university_code, label: r.university_name, showCode: true }])
   ).values()].sort((a, b) => a.label.localeCompare(b.label, "ru"));
 
   const specialtyOptions = [...new Map(
@@ -360,9 +364,12 @@ function renderPathCard(r, specialties) {
       <summary>
         <div class="path-main">
           <div class="path-uni">${escapeHtml(r.university_name)}</div>
-          <div class="path-sub">${escapeHtml(r.gop_code)} · ${escapeHtml(spName)} · ${quotaLabel}${r.low_sample ? '<span class="badge-note">мало данных</span>' : ""}</div>
+          <div class="path-sub">${escapeHtml(r.gop_code)} · ${escapeHtml(spName)}${r.low_sample ? '<span class="badge-note">мало данных</span>' : ""}</div>
         </div>
-        <span class="badge ${conf.cls}">${pct(r.p)} · ${conf.text}</span>
+        <div class="path-badges">
+          <span class="badge-quota ${r.quota_id}">${quotaLabel}</span>
+          <span class="badge ${conf.cls}">${pct(r.p)} · ${conf.text}</span>
+        </div>
       </summary>
       <div class="path-details">
         <div class="detail-grid">
