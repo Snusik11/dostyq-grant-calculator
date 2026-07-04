@@ -244,6 +244,16 @@ function localizedName(entity) {
   return entity.name || entity.full_name || "";
 }
 
+// Регион вуза в датасете хранится на казахском (так его отдаёт eduser.app
+// по умолчанию) плюс отдельное поле region_ru для русского режима — список
+// каталога eduser не переводит регион вообще независимо от локали, перевод
+// пришлось забирать отдельным проходом с детальных страниц (см. scrape_eduser.py).
+function localizedRegion(entity) {
+  if (!entity) return null;
+  if (LANG === "ru" && entity.region_ru) return entity.region_ru;
+  return entity.region || entity.region_ru || null;
+}
+
 // Не у каждой специальности есть свой казахский перевод пары предметов
 // (eduser покрывает не 100% кодов), но одну и ту же пару предметов может
 // делить много специальностей — если перевод есть хотя бы у одной из них,
@@ -807,9 +817,13 @@ function renderUniversitiesList(app) {
   const items = [...universities].sort((a, b) => localizedName(a).localeCompare(localizedName(b), "ru"));
 
   const universityOptions = items.map((u) => ({ value: u.code, label: localizedName(u), showCode: true }));
-  const regionOptions = [...new Set(items.map((u) => u.region).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, "ru"))
-    .map((r) => ({ value: r, label: r }));
+  const regionByKey = new Map();
+  for (const u of items) {
+    if (u.region && !regionByKey.has(u.region)) regionByKey.set(u.region, localizedRegion(u));
+  }
+  const regionOptions = [...regionByKey.entries()]
+    .sort((a, b) => a[1].localeCompare(b[1], "ru"))
+    .map(([key, label]) => ({ value: key, label }));
 
   app.innerHTML = `
     <h1>${t("universitiesList.title")}</h1>
@@ -838,7 +852,7 @@ function renderUniversitiesList(app) {
             <tr>
               <td><a href="#/universities/${u.code}">${u.code}</a></td>
               <td><a href="#/universities/${u.code}">${escapeHtml(localizedName(u))}</a></td>
-              <td>${escapeHtml(u.region || "—")}</td>
+              <td>${escapeHtml(localizedRegion(u) || "—")}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -876,7 +890,7 @@ function renderUniversityDetail(app, code) {
 
   app.innerHTML = `
     <h1>${escapeHtml(localizedName(uni))}</h1>
-    <p class="lede">${t("universityDetail.code", { code: uni.code })}${uni.region ? ` · ${escapeHtml(uni.region)}` : ""}${dormText ? ` · ${dormText}` : ""}${militaryText ? ` · ${militaryText}` : ""}</p>
+    <p class="lede">${t("universityDetail.code", { code: uni.code })}${localizedRegion(uni) ? ` · ${escapeHtml(localizedRegion(uni))}` : ""}${dormText ? ` · ${dormText}` : ""}${militaryText ? ` · ${militaryText}` : ""}</p>
     <h2>${t("quota.general")}</h2>
     ${renderCutoffTable(general, { linkTo: "specialties", labelFn })}
     ${rural.length ? `<h2>${t("quota.rural")}</h2>${renderCutoffTable(rural, { linkTo: "specialties", labelFn })}` : ""}
