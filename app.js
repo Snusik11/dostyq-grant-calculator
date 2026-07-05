@@ -98,6 +98,10 @@ const I18N = {
     "universitiesList.code": "Код",
     "universitiesList.university": "Вуз",
     "universitiesList.region": "Регион",
+    "universitiesList.dormitory": "Общежитие",
+    "universitiesList.militaryDept": "Военная кафедра",
+    "universitiesList.allDormitory": "Общежитие — неважно",
+    "universitiesList.allMilitaryDept": "Военная кафедра — неважно",
     "universityDetail.code": "Код ОВПО: {code}",
     "universityDetail.dormitory": "Общежитие: {value}",
     "universityDetail.militaryDept": "Военная кафедра: {value}",
@@ -195,6 +199,10 @@ const I18N = {
     "universitiesList.code": "Код",
     "universitiesList.university": "ЖОО",
     "universitiesList.region": "Аймақ",
+    "universitiesList.dormitory": "Жатақхана",
+    "universitiesList.militaryDept": "Әскери кафедра",
+    "universitiesList.allDormitory": "Жатақхана — маңызды емес",
+    "universitiesList.allMilitaryDept": "Әскери кафедра — маңызды емес",
     "universityDetail.code": "ОВПО коды: {code}",
     "universityDetail.dormitory": "Жатақхана: {value}",
     "universityDetail.militaryDept": "Әскери кафедра: {value}",
@@ -883,7 +891,7 @@ function renderCutoffTable(rows, { linkTo, labelFn }) {
   const headLabel = linkTo === "universities" ? t("cutoffTable.university") : t("cutoffTable.specialty");
   return `
     <table class="stat-table">
-      <thead><tr><th>${headLabel}</th><th>${t("cutoffTable.cutoff2025")}</th><th>${t("cutoffTable.minMaxByYear")}</th><th>${t("cutoffTable.median")}</th><th>${t("cutoffTable.winners")}</th></tr></thead>
+      <thead><tr><th>${headLabel}</th><th>${t("cutoffTable.cutoff2025")}</th><th>${t("cutoffTable.minMaxByYear")}</th><th>${t("cutoffTable.median")}</th><th>${t("cutoffTable.winners")}</th><th>${t("path.thresholdCol")}</th></tr></thead>
       <tbody>
         ${sorted.map((r) => `
           <tr>
@@ -892,6 +900,7 @@ function renderCutoffTable(rows, { linkTo, labelFn }) {
             <td>${renderYearlyBreakdown(r.yearly) || `${r.min_2025}–${r.max_2025}`}</td>
             <td>${r.median_2025}</td>
             <td>${r.winners_count_2025}${r.low_sample ? ` <span class="badge-note">${t("path.lowSample")}</span>` : ""}</td>
+            <td>${r.threshold_score ?? "—"}</td>
           </tr>
         `).join("")}
       </tbody>
@@ -1054,7 +1063,7 @@ function renderSpecialtyDetail(app, code) {
 
 function renderUniversitiesList(app) {
   const { universities } = state.data;
-  const items = [...universities].sort((a, b) => localizedName(a).localeCompare(localizedName(b), "ru"));
+  const items = [...universities].sort((a, b) => a.code.localeCompare(b.code));
 
   const universityOptions = items.map((u) => ({ value: u.code, label: localizedName(u), showCode: true }));
   const regionByKey = new Map();
@@ -1064,6 +1073,11 @@ function renderUniversitiesList(app) {
   const regionOptions = [...regionByKey.entries()]
     .sort((a, b) => a[1].localeCompare(b[1], "ru"))
     .map(([key, label]) => ({ value: key, label }));
+  const yesNoOptions = [
+    { value: "yes", label: t("universityDetail.yes") },
+    { value: "no", label: t("universityDetail.no") },
+  ];
+  const hasFlag = (value) => value === "Иә";
 
   app.innerHTML = `
     <h1>${t("universitiesList.title")}</h1>
@@ -1072,27 +1086,39 @@ function renderUniversitiesList(app) {
       <div class="result-controls">
         <div id="university-filter-mount"></div>
         <div id="region-filter-mount"></div>
+        <div id="dorm-filter-mount"></div>
+        <div id="military-filter-mount"></div>
       </div>
       <div id="list"></div>
     </div>
   `;
   const listEl = document.getElementById("list");
-  const filterState = { university: "", region: "" };
+  const filterState = { university: "", region: "", dormitory: "", military: "" };
 
   function draw() {
     const filtered = items.filter((u) =>
       (!filterState.university || u.code === filterState.university) &&
-      (!filterState.region || u.region === filterState.region)
+      (!filterState.region || u.region === filterState.region) &&
+      (!filterState.dormitory || (filterState.dormitory === "yes") === hasFlag(u.dormitory)) &&
+      (!filterState.military || (filterState.military === "yes") === hasFlag(u.military_department))
     );
     listEl.innerHTML = `
       <table class="stat-table">
-        <thead><tr><th>${t("universitiesList.code")}</th><th>${t("universitiesList.university")}</th><th>${t("universitiesList.region")}</th></tr></thead>
+        <thead><tr>
+          <th>${t("universitiesList.code")}</th>
+          <th>${t("universitiesList.university")}</th>
+          <th>${t("universitiesList.region")}</th>
+          <th>${t("universitiesList.dormitory")}</th>
+          <th>${t("universitiesList.militaryDept")}</th>
+        </tr></thead>
         <tbody>
           ${filtered.map((u) => `
             <tr>
               <td><a href="#/universities/${u.code}">${u.code}</a></td>
               <td><a href="#/universities/${u.code}">${escapeHtml(localizedName(u))}</a></td>
               <td>${escapeHtml(localizedRegion(u) || "—")}</td>
+              <td>${hasFlag(u.dormitory) ? t("universityDetail.yes") : t("universityDetail.no")}</td>
+              <td>${hasFlag(u.military_department) ? t("universityDetail.yes") : t("universityDetail.no")}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -1109,6 +1135,16 @@ function renderUniversitiesList(app) {
     allLabel: t("universitiesList.allRegions"),
     options: regionOptions,
     onChange: (value) => { filterState.region = value; draw(); },
+  });
+  createSearchableSelect(document.getElementById("dorm-filter-mount"), {
+    allLabel: t("universitiesList.allDormitory"),
+    options: yesNoOptions,
+    onChange: (value) => { filterState.dormitory = value; draw(); },
+  });
+  createSearchableSelect(document.getElementById("military-filter-mount"), {
+    allLabel: t("universitiesList.allMilitaryDept"),
+    options: yesNoOptions,
+    onChange: (value) => { filterState.military = value; draw(); },
   });
 
   draw();
@@ -1128,14 +1164,34 @@ function renderUniversityDetail(app, code) {
   const dormText = uni.dormitory ? t("universityDetail.dormitory", { value: uni.dormitory === "Иә" ? t("universityDetail.yes") : t("universityDetail.no") }) : "";
   const militaryText = uni.military_department ? t("universityDetail.militaryDept", { value: uni.military_department === "Иә" ? t("universityDetail.yes") : t("universityDetail.no") }) : "";
 
+  const specialtyOptions = [...new Map(
+    [...general, ...rural].map((r) => [r.gop_code, { value: r.gop_code, label: `${r.gop_code} — ${localizedName(specialties[r.gop_code])}`, showCode: true }])
+  ).values()].sort((a, b) => a.label.localeCompare(b.label, "ru"));
+
   app.innerHTML = `
     <h1>${escapeHtml(localizedName(uni))}</h1>
     <p class="lede">${t("universityDetail.code", { code: uni.code })}${localizedRegion(uni) ? ` · ${escapeHtml(localizedRegion(uni))}` : ""}${dormText ? ` · ${dormText}` : ""}${militaryText ? ` · ${militaryText}` : ""}</p>
-    <h2>${t("quota.general")}</h2>
-    ${renderCutoffTable(general, { linkTo: "specialties", labelFn })}
-    ${rural.length ? `<h2>${t("quota.rural")}</h2>${renderCutoffTable(rural, { linkTo: "specialties", labelFn })}` : ""}
+    <div class="result-controls"><div id="specialty-filter-mount"></div></div>
+    <div id="specialty-tables"></div>
     <p style="margin-top:20px"><a href="#/universities">${t("universityDetail.backLink")}</a></p>
   `;
+
+  const tablesEl = document.getElementById("specialty-tables");
+  function drawTables(filterCode) {
+    const g = filterCode ? general.filter((r) => r.gop_code === filterCode) : general;
+    const r = filterCode ? rural.filter((p) => p.gop_code === filterCode) : rural;
+    tablesEl.innerHTML = `
+      <h2>${t("quota.general")}</h2>
+      ${renderCutoffTable(g, { linkTo: "specialties", labelFn })}
+      ${r.length ? `<h2>${t("quota.rural")}</h2>${renderCutoffTable(r, { linkTo: "specialties", labelFn })}` : ""}
+    `;
+  }
+  createSearchableSelect(document.getElementById("specialty-filter-mount"), {
+    allLabel: t("specialtiesList.allSpecialties"),
+    options: specialtyOptions,
+    onChange: (value) => drawTables(value),
+  });
+  drawTables("");
 }
 
 // ---------- Инициализация ----------
