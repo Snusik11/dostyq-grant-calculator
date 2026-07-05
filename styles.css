@@ -305,8 +305,8 @@ button.primary:focus-visible { outline: 3px solid var(--brand-light); outline-of
 .result-count { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 12px; }
 
 /* Карточка специальности в результатах — гранты выделяются на специальность,
-   поэтому это верхний уровень группировки; вузы (общий грант / пед-квота)
-   вложены внутрь как под-разделы. */
+   поэтому это верхний уровень группировки; раскрывается по клику (дропдаун),
+   вузы (общий грант / пед-квота) внутри как под-разделы. */
 .specialty-result-card {
   background: var(--bg-soft);
   border: 1px solid var(--border);
@@ -314,9 +314,24 @@ button.primary:focus-visible { outline: 3px solid var(--brand-light); outline-of
   padding: 18px 20px;
   margin-bottom: 18px;
 }
-.specialty-result-header { margin-bottom: 14px; }
+.specialty-result-header {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.specialty-result-header::-webkit-details-marker { display: none; }
+.specialty-result-main { flex: 1; min-width: 0; }
+.specialty-result-body { margin-top: 14px; }
 .specialty-result-title { font-weight: 700; font-size: 1.05rem; }
 .specialty-result-subjects { color: var(--text-muted); font-size: 0.85rem; margin-top: 2px; }
+
+.card-link { font-weight: 600; white-space: nowrap; }
+
+/* Акцент на проходной балл (порог допуска) в раскрытой строке вуза. */
+.detail-grid .detail-accent b { font-size: 1.5rem; color: var(--brand); }
 
 .grant-pool { margin-top: 12px; }
 .grant-pool-title {

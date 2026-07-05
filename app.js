@@ -42,7 +42,11 @@ const I18N = {
     "results.disclaimer": "Оценка — эвристика на основе тренда баллов реальных победителей 2023–2025 годов (edutest.kz — для педагогической квоты и части лет) и изменения числа грантов в 2026-2027 году. Не гарантия поступления.",
     "results.generalGrant": "Общий грант",
     "results.pedQuota": "Педагогическая квота",
+    "results.thresholdFiltered": "Показаны только вузы, куда твой балл проходит по порогу допуска.",
     "path.thresholdLabel": "проходной балл (допуск к конкурсу)",
+    "path.lastYearMin": "мин. балл победителя {year}",
+    "btn.uniCard": "Карточка вуза →",
+    "btn.specCard": "Карточка специальности →",
     "path.lowSample": "мало данных",
     "path.year": "Год",
     "path.cutoffCol": "Проходной",
@@ -143,7 +147,11 @@ const I18N = {
     "results.disclaimer": "Бағалау — 2023–2025 жылдардағы нақты грант иегерлерінің балл трендіне (педагогикалық квота және кейбір жылдар үшін — edutest.kz) және 2026-2027 жылғы грант санының өзгеруіне негізделген эвристика. Түсуге кепілдік емес.",
     "results.generalGrant": "Жалпы грант",
     "results.pedQuota": "Педагогикалық квота",
+    "results.thresholdFiltered": "Тек балың рұқсат шегінен өтетін ЖОО-лар көрсетілген.",
     "path.thresholdLabel": "өту балы (конкурсқа рұқсат)",
+    "path.lastYearMin": "{year} жылғы жеңімпаздың мин. балы",
+    "btn.uniCard": "ЖОО картасы →",
+    "btn.specCard": "Мамандық картасы →",
     "path.lowSample": "деректер аз",
     "path.year": "Жыл",
     "path.cutoffCol": "Өту балы",
@@ -574,30 +582,67 @@ function renderResults(container, { comboKey, score, rural, otherQuotas }) {
 
   const scored = rows.map((r) => ({ ...r, p: probabilityAt(r.probability_curve, score) }));
 
+  // Вуз не показывается, если его проходной балл (порог допуска к конкурсу)
+  // выше балла ученика — подать документы туда всё равно нельзя. Вузы без
+  // известного порога остаются в списке.
+  const passesThreshold = (threshold) => threshold == null || score >= threshold;
+
   // Гранты выделяются на специальность, а не на вуз — сначала группируем
   // по ГОП (общий грант и пед-квота — РАЗНЫЕ пулы, у пед-квоты вузы вообще
   // не участвуют в общем конкурсе на эти же места), внутри уже вузы.
+  // Один вуз = одна строка: общий конкурс и сельская квота — два бейджа
+  // рядом, а не две отдельные карточки.
   const specialtyGroups = [];
   for (const code of gopCodes) {
     const sp = specialties[code];
     if (!sp) continue;
-    const generalRows = scored.filter((r) => r.gop_code === code).sort((a, b) => b.p - a.p);
+
+    const byUni = new Map();
+    for (const r of scored.filter((x) => x.gop_code === code)) {
+      const m = byUni.get(r.university_code) || {
+        university_code: r.university_code,
+        university_name: r.university_name,
+        university_name_kk: r.university_name_kk,
+        threshold_score: r.threshold_score,
+        general: null, rural: null, pGeneral: null, pRural: null,
+      };
+      m.threshold_score = m.threshold_score ?? r.threshold_score;
+      if (r.quota_id === "rural") { m.rural = r; m.pRural = r.p; }
+      else { m.general = r; m.pGeneral = r.p; }
+      byUni.set(r.university_code, m);
+    }
+    const generalRows = [...byUni.values()]
+      .filter((m) => passesThreshold(m.threshold_score))
+      .sort((a, b) => Math.max(b.pGeneral ?? 0, b.pRural ?? 0) - Math.max(a.pGeneral ?? 0, a.pRural ?? 0));
+
     const pedByUni = (sp.ped_quota && sp.ped_quota.by_university) || {};
     const pedRows = Object.entries(pedByUni).map(([universityCode, u]) => ({
       university_code: universityCode,
       ...u,
       pGeneral: u.probability_curve_general ? probabilityAt(u.probability_curve_general, score) : null,
       pRural: rural && u.probability_curve_rural ? probabilityAt(u.probability_curve_rural, score) : null,
-    })).sort((a, b) => Math.max(b.pGeneral ?? 0, b.pRural ?? 0) - Math.max(a.pGeneral ?? 0, a.pRural ?? 0));
+    }))
+      .filter((r) => passesThreshold(r.threshold_score))
+      .sort((a, b) => Math.max(b.pGeneral ?? 0, b.pRural ?? 0) - Math.max(a.pGeneral ?? 0, a.pRural ?? 0));
 
     if (generalRows.length === 0 && pedRows.length === 0) continue;
-    const bestP = Math.max(
-      generalRows[0]?.p ?? 0,
-      ...pedRows.map((r) => Math.max(r.pGeneral ?? 0, r.pRural ?? 0))
-    );
-    specialtyGroups.push({ code, sp, generalRows, pedRows, bestP });
+
+    // Процент самой специальности — по агрегатному порогу общего гранта
+    // (кривая предпосчитана на уровне специальности в build_dataset.py).
+    const pSpecGeneral = sp.probability_curve_general ? probabilityAt(sp.probability_curve_general, score) : null;
+    const pSpecRural = rural && sp.probability_curve_rural ? probabilityAt(sp.probability_curve_rural, score) : null;
+
+    // Тренд числа грантов — свойство специальности (грант выделяется на неё),
+    // показывается один раз в шапке, не в каждом вузе.
+    const summaryYearly = (sp.general_grant_summary && sp.general_grant_summary.yearly) || [];
+    const countsByYear = Object.fromEntries(summaryYearly.filter((y) => y.count != null).map((y) => [y.year, y.count]));
+
+    const bestP = Math.max(pSpecGeneral ?? 0, pSpecRural ?? 0,
+      ...generalRows.map((r) => Math.max(r.pGeneral ?? 0, r.pRural ?? 0)),
+      ...pedRows.map((r) => Math.max(r.pGeneral ?? 0, r.pRural ?? 0)));
+    specialtyGroups.push({ code, sp, generalRows, pedRows, pSpecGeneral, pSpecRural, countsByYear, bestP });
   }
-  specialtyGroups.sort((a, b) => b.bestP - a.bestP);
+  specialtyGroups.sort((a, b) => Math.max(b.pSpecGeneral ?? 0, b.pSpecRural ?? 0, b.bestP) - Math.max(a.pSpecGeneral ?? 0, a.pSpecRural ?? 0, a.bestP));
 
   if (specialtyGroups.length === 0) {
     container.innerHTML = `<div class="empty-state">${t("results.emptyCombo")}</div>`;
@@ -611,6 +656,7 @@ function renderResults(container, { comboKey, score, rural, otherQuotas }) {
       <div id="specialty-filter-mount"></div>
     </div>
     <div class="result-count" id="result-count"></div>
+    <p class="hint">${t("results.thresholdFiltered")}</p>
     <div id="result-list"></div>
     ${groupRows.length ? renderGroupQuotaSection(groupRows, score) : ""}
     <div class="disclaimer">${t("results.disclaimer")}</div>
@@ -662,123 +708,153 @@ function renderResults(container, { comboKey, score, rural, otherQuotas }) {
   draw();
 }
 
+// Бейджи "Общий конкурс N%" + "Сельская квота M%" рядом — единый вид и для
+// строки вуза, и для заголовка специальности.
+function quotaBadges(pGeneral, pRural) {
+  const badges = [];
+  if (pGeneral != null) {
+    const conf = confidenceLabel(pGeneral);
+    badges.push(`<span class="badge-quota general">${t("quota.general")}</span><span class="badge ${conf.cls}">${pct(pGeneral)} · ${conf.text}</span>`);
+  }
+  if (pRural != null) {
+    const conf = confidenceLabel(pRural);
+    badges.push(`<span class="badge-quota rural">${t("quota.rural")}</span><span class="badge ${conf.cls}">${pct(pRural)} · ${conf.text}</span>`);
+  }
+  return badges.join("");
+}
+
+function grantsTrendNote(countsByYear) {
+  const c25 = countsByYear[2025];
+  const c26 = countsByYear[2026];
+  const trend = c25 != null && c26 != null
+    ? (c26 >= c25 ? t("path.trendMore", { from: c25, to: c26 }) : t("path.trendLess", { from: c25, to: c26 }))
+    : t("path.trendNone");
+  return t("path.trendNote", { trend });
+}
+
 function renderSpecialtyResultCard(group) {
-  const { code, sp, generalRows, pedRows } = group;
+  const { code, sp, generalRows, pedRows, pSpecGeneral, pSpecRural, countsByYear } = group;
   const spName = localizedName(sp) || code;
   const combosText = localizedSubjectCombos(sp).map(formatSubjectCombo).join(" / ");
 
   return `
-    <div class="specialty-result-card">
-      <div class="specialty-result-header">
-        <div class="specialty-result-title">${escapeHtml(code)} — ${escapeHtml(spName)}</div>
-        <div class="specialty-result-subjects">${escapeHtml(combosText)}</div>
+    <details class="specialty-result-card">
+      <summary class="specialty-result-header">
+        <div class="specialty-result-main">
+          <div class="specialty-result-title">${escapeHtml(code)} — ${escapeHtml(spName)}</div>
+          <div class="specialty-result-subjects">${escapeHtml(combosText)}</div>
+        </div>
+        <div class="path-badges">${quotaBadges(pSpecGeneral, pSpecRural)}</div>
+      </summary>
+      <div class="specialty-result-body">
+        <p class="hint">${grantsTrendNote(countsByYear)} <a class="card-link" href="#/specialties/${encodeURIComponent(code)}">${t("btn.specCard")}</a></p>
+        ${generalRows.length ? `
+          <div class="grant-pool">
+            <h3 class="grant-pool-title">${t("results.generalGrant")}</h3>
+            ${generalRows.map((r) => renderMergedUniRow(r)).join("")}
+          </div>
+        ` : ""}
+        ${pedRows.length ? `
+          <div class="grant-pool">
+            <h3 class="grant-pool-title">${t("results.pedQuota")}</h3>
+            ${pedRows.map((r) => renderPedUniRow(r)).join("")}
+          </div>
+        ` : ""}
       </div>
-      ${generalRows.length ? `
-        <div class="grant-pool">
-          <h3 class="grant-pool-title">${t("results.generalGrant")}</h3>
-          ${generalRows.map((r) => renderUniPathRow(r)).join("")}
-        </div>
-      ` : ""}
-      ${pedRows.length ? `
-        <div class="grant-pool">
-          <h3 class="grant-pool-title">${t("results.pedQuota")}</h3>
-          ${pedRows.map((r) => renderPedUniRow(r)).join("")}
-        </div>
-      ` : ""}
+    </details>
+  `;
+}
+
+// Объединяет погодовые истории общего конкурса и сельской квоты одного вуза
+// в одну таблицу: год | общий мин–макс | сельский мин–макс | победителей.
+function mergePathYearly(generalRow, ruralRow) {
+  const byYear = new Map();
+  for (const y of (generalRow?.yearly || [])) {
+    byYear.set(y.year, { year: y.year, general: { min: y.min, max: y.max }, rural: null, count: y.count });
+  }
+  for (const y of (ruralRow?.yearly || [])) {
+    const e = byYear.get(y.year) || { year: y.year, general: null, rural: null, count: 0 };
+    e.rural = { min: y.min, max: y.max };
+    e.count = (e.count || 0) + y.count;
+    byYear.set(y.year, e);
+  }
+  return [...byYear.values()].sort((a, b) => a.year - b.year);
+}
+
+function yearlyQuotaTable(rows) {
+  if (!rows.length) return `<p class="hint">${t("cutoffTable.noData")}</p>`;
+  return `
+    <table class="stat-table yearly-table">
+      <thead><tr><th>${t("path.year")}</th><th>${t("quota.general")}</th><th>${t("quota.rural")}</th><th>${t("path.winnersCol")}</th></tr></thead>
+      <tbody>
+        ${rows.map((y) => `<tr><td>${y.year}</td><td>${y.general ? `${y.general.min}–${y.general.max}` : "—"}</td><td>${y.rural ? `${y.rural.min}–${y.rural.max}` : "—"}</td><td>${y.count ?? "—"}</td></tr>`).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+// Раскрываемая строка вуза: акцент — на проходной балл (порог допуска)
+// текущего цикла; исторический минимум победителя — второстепенная справка.
+function uniRowDetails({ threshold, lastYearMin, lastYear, yearlyRows, uniCode }) {
+  return `
+    <div class="path-details">
+      <div class="detail-grid">
+        <div class="detail-accent"><b>${threshold ?? "—"}</b><span>${t("path.thresholdLabel")}</span></div>
+        ${lastYearMin != null ? `<div><b>${lastYearMin}</b><span>${t("path.lastYearMin", { year: lastYear })}</span></div>` : ""}
+      </div>
+      ${yearlyQuotaTable(yearlyRows)}
+      <p><a class="card-link" href="#/universities/${uniCode}">${t("btn.uniCard")}</a></p>
     </div>
   `;
 }
 
-function renderUniPathRow(r) {
-  const conf = confidenceLabel(r.p);
-  const uniName = localizedName({ name: r.university_name, name_kk: r.university_name_kk });
-  const quotaLabel = r.quota_id === "rural" ? t("quota.rural") : t("quota.general");
-  const rangeSpan = Math.max(1, r.max_2025 - r.min_2025);
-  const cutoffPos = ((r.cutoff_2025 - r.min_2025) / rangeSpan) * 100;
-  const latestYear = r.data_years ? r.data_years[r.data_years.length - 1] : 2025;
-  const yearsNote = r.yearly && r.yearly.length > 1
-    ? `
-        <table class="stat-table yearly-table">
-          <thead><tr><th>${t("path.year")}</th><th>${t("path.cutoffCol")}</th><th>${t("path.minMaxCol")}</th><th>${t("path.winnersCol")}</th></tr></thead>
-          <tbody>
-            ${r.yearly.map((y) => `<tr><td>${y.year}</td><td>${y.cutoff}</td><td>${y.min}–${y.max}</td><td>${y.count}</td></tr>`).join("")}
-          </tbody>
-        </table>
-      `
-    : `<p class="hint">${t("path.onlyYear", { year: latestYear })}</p>`;
-  const trend = r.grants_2025 && r.grants_2026
-    ? (r.grants_2026 >= r.grants_2025
-        ? t("path.trendMore", { from: r.grants_2025, to: r.grants_2026 })
-        : t("path.trendLess", { from: r.grants_2025, to: r.grants_2026 }))
-    : t("path.trendNone");
-  const thresholdNote = r.threshold_score ? `<p class="hint">${r.threshold_score} — ${t("path.thresholdLabel")}</p>` : "";
+function renderMergedUniRow(m) {
+  const uniName = localizedName({ name: m.university_name, name_kk: m.university_name_kk });
+  const base = m.general || m.rural;
+  const lastYear = base.data_years ? base.data_years[base.data_years.length - 1] : 2025;
+  const lowSample = (m.general?.low_sample ?? true) && (m.rural?.low_sample ?? true);
 
   return `
     <details class="path-card">
       <summary>
         <div class="path-main">
-          <div class="path-uni">${escapeHtml(uniName)}</div>
-          <div class="path-sub">${r.low_sample ? `<span class="badge-note">${t("path.lowSample")}</span>` : ""}</div>
+          <div class="path-uni">${m.university_code} — ${escapeHtml(uniName)}</div>
+          <div class="path-sub">${lowSample ? `<span class="badge-note">${t("path.lowSample")}</span>` : ""}</div>
         </div>
-        <div class="path-badges">
-          <span class="badge-quota ${r.quota_id}">${quotaLabel}</span>
-          <span class="badge ${conf.cls}">${pct(r.p)} · ${conf.text}</span>
-        </div>
+        <div class="path-badges">${quotaBadges(m.pGeneral, m.pRural)}</div>
       </summary>
-      <div class="path-details">
-        <div class="detail-grid">
-          <div><b>${r.cutoff_2025}</b><span>${t("path.cutoffAt", { year: latestYear })}</span></div>
-          <div><b>${r.min_2025}–${r.max_2025}</b><span>${t("path.scoreRange")}</span></div>
-          <div><b>${r.median_2025}</b><span>${t("path.median")}</span></div>
-          <div><b>${r.winners_count_2025}</b><span>${t("path.winnersIn", { year: latestYear })}</span></div>
-        </div>
-        <div class="range-track">
-          <div class="range-fill" style="left:0; width:${cutoffPos}%"></div>
-          <div class="range-marker" style="left:${cutoffPos}%"></div>
-        </div>
-        <div class="range-labels"><span>${r.min_2025}</span><span>${t("path.cutoffLabel")}: ${r.cutoff_2025}</span><span>${r.max_2025}</span></div>
-        ${yearsNote}
-        ${thresholdNote}
-        <p class="hint">${t("path.trendNote", { trend })}</p>
-      </div>
+      ${uniRowDetails({
+        threshold: m.threshold_score,
+        lastYearMin: m.general?.cutoff_2025 ?? m.rural?.cutoff_2025,
+        lastYear,
+        yearlyRows: mergePathYearly(m.general, m.rural),
+        uniCode: m.university_code,
+      })}
     </details>
   `;
 }
 
 function renderPedUniRow(r) {
   const uniName = localizedName({ name: r.university_name, name_kk: r.university_name_kk });
-  const badges = [];
-  if (r.pGeneral !== null) {
-    const conf = confidenceLabel(r.pGeneral);
-    badges.push(`<span class="badge-quota general">${t("quota.general")}</span><span class="badge ${conf.cls}">${pct(r.pGeneral)} · ${conf.text}</span>`);
-  }
-  if (r.pRural !== null) {
-    const conf = confidenceLabel(r.pRural);
-    badges.push(`<span class="badge-quota rural">${t("quota.rural")}</span><span class="badge ${conf.cls}">${pct(r.pRural)} · ${conf.text}</span>`);
-  }
-  const yearsRows = (r.yearly || []).filter((y) => y.general || y.rural);
-  const yearsTable = yearsRows.length ? `
-    <table class="stat-table yearly-table">
-      <thead><tr><th>${t("path.year")}</th><th>${t("quota.general")}</th><th>${t("quota.rural")}</th><th>${t("path.winnersCol")}</th></tr></thead>
-      <tbody>
-        ${yearsRows.map((y) => `<tr><td>${y.year}</td><td>${y.general ? `${y.general.min}–${y.general.max}` : "—"}</td><td>${y.rural ? `${y.rural.min}–${y.rural.max}` : "—"}</td><td>${y.count ?? "—"}</td></tr>`).join("")}
-      </tbody>
-    </table>
-  ` : `<p class="hint">${t("cutoffTable.noData")}</p>`;
-  const thresholdNote = r.threshold_score ? `<p class="hint">${r.threshold_score} — ${t("path.thresholdLabel")}</p>` : "";
+  const yearsRows = (r.yearly || []).filter((y) => y.general || y.rural || y.count != null);
+  const scoreYears = yearsRows.filter((y) => y.general || y.rural);
+  const lastScoreYear = scoreYears.length ? scoreYears[scoreYears.length - 1] : null;
 
   return `
     <details class="path-card">
       <summary>
         <div class="path-main">
-          <div class="path-uni">${escapeHtml(uniName)}</div>
+          <div class="path-uni">${r.university_code} — ${escapeHtml(uniName)}</div>
         </div>
-        <div class="path-badges">${badges.join("")}</div>
+        <div class="path-badges">${quotaBadges(r.pGeneral, r.pRural)}</div>
       </summary>
-      <div class="path-details">
-        ${yearsTable}
-        ${thresholdNote}
-      </div>
+      ${uniRowDetails({
+        threshold: r.threshold_score,
+        lastYearMin: lastScoreYear?.general?.min ?? lastScoreYear?.rural?.min,
+        lastYear: lastScoreYear?.year,
+        yearlyRows: yearsRows,
+        uniCode: r.university_code,
+      })}
     </details>
   `;
 }
