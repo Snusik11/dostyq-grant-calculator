@@ -85,6 +85,11 @@ const I18N = {
     "specialtyDetail.grants": "Грантов на 2026-2027: {n}",
     "specialtyDetail.backLink": "← Все специальности",
     "specialtyDetail.notFound": "Специальность не найдена.",
+    "specialtyDetail.minMax": "Мин/макс баллы",
+    "specialtyDetail.grantCounts": "Количество грантов",
+    "specialtyDetail.universitiesSection": "Вузы",
+    "specialtyDetail.allUniversities": "Все вузы",
+    "path.thresholdCol": "Проходной балл",
     "universitiesList.title": "Вузы",
     "universitiesList.lede": "Проходные баллы 2025 года по специальностям каждого вуза.",
     "universitiesList.searchPlaceholder": "Поиск по коду, названию или региону...",
@@ -177,6 +182,11 @@ const I18N = {
     "specialtyDetail.grants": "2026-2027 грант саны: {n}",
     "specialtyDetail.backLink": "← Барлық мамандықтар",
     "specialtyDetail.notFound": "Мамандық табылмады.",
+    "specialtyDetail.minMax": "Мин/макс баллдар",
+    "specialtyDetail.grantCounts": "Грант саны",
+    "specialtyDetail.universitiesSection": "ЖОО-лар",
+    "specialtyDetail.allUniversities": "Барлық ЖОО-лар",
+    "path.thresholdCol": "Өту балы",
     "universitiesList.title": "ЖОО-лар",
     "universitiesList.lede": "Әр ЖОО-ның мамандықтары бойынша 2025 жылғы өту баллдары.",
     "universitiesList.searchPlaceholder": "Код, атауы немесе аймақ бойынша іздеу...",
@@ -836,7 +846,7 @@ function renderSpecialtiesList(app) {
             <tr>
               <td><a href="#/specialties/${code}">${code}</a></td>
               <td><a href="#/specialties/${code}">${escapeHtml(localizedName(s))}</a></td>
-              <td>${s.subject_combo ? escapeHtml(formatSubjectCombo(localizedSubjectCombo(s))) : "—"}</td>
+              <td>${localizedSubjectCombos(s).length ? escapeHtml(localizedSubjectCombos(s).map(formatSubjectCombo).join(" / ")) : "—"}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -889,6 +899,21 @@ function renderCutoffTable(rows, { linkTo, labelFn }) {
   `;
 }
 
+// Компактный формат "год: мин–макс" (или "год: число") по годам в одной
+// ячейке — иначе таблица по вузам пед-квоты (до ~19 строк) разрослась бы в
+// огромную простыню отдельных таблиц одна под другой.
+function formatYearlyMinMax(yearly, field) {
+  const rows = (yearly || []).filter((y) => y[field]);
+  if (!rows.length) return "—";
+  return rows.map((y) => `${y.year}: ${y[field].min}–${y[field].max}`).join("<br>");
+}
+
+function formatYearlyCounts(yearly) {
+  const rows = (yearly || []).filter((y) => y.count != null);
+  if (!rows.length) return "—";
+  return rows.map((y) => `${y.year}: ${y.count}`).join("<br>");
+}
+
 function renderSpecialtyDetail(app, code) {
   const { specialties, paths } = state.data;
   const sp = specialties[code];
@@ -899,16 +924,132 @@ function renderSpecialtyDetail(app, code) {
   const general = paths.filter((p) => p.gop_code === code && p.quota_id === "general");
   const rural = paths.filter((p) => p.gop_code === code && p.quota_id === "rural");
   const labelFn = (r) => localizedName({ name: r.university_name, name_kk: r.university_name_kk });
+  const combosText = localizedSubjectCombos(sp).map(formatSubjectCombo).join(" / ");
+
+  const summaryYearly = (sp.general_grant_summary && sp.general_grant_summary.yearly) || [];
+  const pedEntries = Object.entries((sp.ped_quota && sp.ped_quota.by_university) || {});
+
+  // Раздел 1: мин/макс баллы — общий грант агрегатом (без разбивки по
+  // вузам, это один пул), пед-квота отдельно по каждому вузу.
+  const minMaxSection = `
+    <h2>${t("specialtyDetail.minMax")}</h2>
+    <h3>${t("results.generalGrant")}</h3>
+    ${summaryYearly.length ? `
+      <table class="stat-table">
+        <thead><tr><th>${t("path.year")}</th><th>${t("quota.general")}</th><th>${t("quota.rural")}</th></tr></thead>
+        <tbody>
+          ${summaryYearly.map((y) => `<tr><td>${y.year}</td><td>${y.general ? `${y.general.min}–${y.general.max}` : "—"}</td><td>${y.rural ? `${y.rural.min}–${y.rural.max}` : "—"}</td></tr>`).join("")}
+        </tbody>
+      </table>
+    ` : `<p class="hint">${t("cutoffTable.noData")}</p>`}
+    ${pedEntries.length ? `
+      <h3>${t("results.pedQuota")}</h3>
+      <table class="stat-table">
+        <thead><tr><th>${t("cutoffTable.university")}</th><th>${t("quota.general")}</th><th>${t("quota.rural")}</th></tr></thead>
+        <tbody>
+          ${pedEntries.map(([uniCode, u]) => `
+            <tr>
+              <td><a href="#/universities/${uniCode}">${escapeHtml(localizedName({ name: u.university_name, name_kk: u.university_name_kk }))}</a></td>
+              <td>${formatYearlyMinMax(u.yearly, "general")}</td>
+              <td>${formatYearlyMinMax(u.yearly, "rural")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    ` : ""}
+  `;
+
+  // Раздел 2: количество грантов — та же структура (общий агрегат / пед-квота
+  // по вузам). Сверка с официальными xls/docx проверяется на этапе сборки
+  // датасета (build_dataset.py), а не в браузере.
+  const countsSection = `
+    <h2>${t("specialtyDetail.grantCounts")}</h2>
+    <h3>${t("results.generalGrant")}</h3>
+    ${summaryYearly.length ? `
+      <table class="stat-table">
+        <thead><tr><th>${t("path.year")}</th><th>${t("cutoffTable.winners")}</th></tr></thead>
+        <tbody>${summaryYearly.map((y) => `<tr><td>${y.year}</td><td>${y.count ?? "—"}</td></tr>`).join("")}</tbody>
+      </table>
+    ` : `<p class="hint">${t("cutoffTable.noData")}</p>`}
+    ${pedEntries.length ? `
+      <h3>${t("results.pedQuota")}</h3>
+      <table class="stat-table">
+        <thead><tr><th>${t("cutoffTable.university")}</th><th>${t("cutoffTable.winners")}</th></tr></thead>
+        <tbody>
+          ${pedEntries.map(([uniCode, u]) => `
+            <tr>
+              <td><a href="#/universities/${uniCode}">${escapeHtml(localizedName({ name: u.university_name, name_kk: u.university_name_kk }))}</a></td>
+              <td>${formatYearlyCounts(u.yearly)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    ` : ""}
+  `;
+
+  // Раздел 3: вузы — объединение общего конкурса/сельской квоты (paths) и
+  // пед-квоты, с проходным баллом (порог допуска, отдельно от исторического
+  // минимума победителя) и поиском/фильтром, как на /specialties и /universities.
+  const uniMap = new Map();
+  for (const p of [...general, ...rural]) {
+    if (!uniMap.has(p.university_code)) {
+      uniMap.set(p.university_code, {
+        code: p.university_code,
+        name: p.university_name,
+        name_kk: p.university_name_kk,
+        threshold: p.threshold_score,
+      });
+    }
+  }
+  for (const [uniCode, u] of pedEntries) {
+    if (!uniMap.has(uniCode)) {
+      uniMap.set(uniCode, {
+        code: uniCode,
+        name: u.university_name,
+        name_kk: u.university_name_kk,
+        threshold: u.threshold_score,
+      });
+    }
+  }
+  const uniList = [...uniMap.values()].sort((a, b) => localizedName(a).localeCompare(localizedName(b), "ru"));
+  const uniOptions = uniList.map((u) => ({ value: u.code, label: localizedName(u), showCode: true }));
 
   app.innerHTML = `
     <h1>${code} — ${escapeHtml(localizedName(sp))}</h1>
-    <p class="lede">${sp.subject_combo ? t("specialtyDetail.subjects", { combo: escapeHtml(formatSubjectCombo(localizedSubjectCombo(sp))) }) : ""}
+    <p class="lede">${combosText ? t("specialtyDetail.subjects", { combo: escapeHtml(combosText) }) : ""}
       · ${t("specialtyDetail.grants", { n: sp.full_time ?? "—" })}</p>
-    <h2>${t("quota.general")}</h2>
-    ${renderCutoffTable(general, { linkTo: "universities", labelFn })}
-    ${rural.length ? `<h2>${t("quota.rural")}</h2>${renderCutoffTable(rural, { linkTo: "universities", labelFn })}` : ""}
+    ${minMaxSection}
+    ${countsSection}
+    <h2>${t("specialtyDetail.universitiesSection")}</h2>
+    <div class="result-controls"><div id="uni-filter-mount"></div></div>
+    <div id="uni-list"></div>
     <p style="margin-top:20px"><a href="#/specialties">${t("specialtyDetail.backLink")}</a></p>
   `;
+
+  const uniListEl = document.getElementById("uni-list");
+  function drawUniList(filterCode) {
+    const filtered = filterCode ? uniList.filter((u) => u.code === filterCode) : uniList;
+    uniListEl.innerHTML = `
+      <table class="stat-table">
+        <thead><tr><th>${t("universitiesList.code")}</th><th>${t("cutoffTable.university")}</th><th>${t("path.thresholdCol")}</th></tr></thead>
+        <tbody>
+          ${filtered.map((u) => `
+            <tr>
+              <td><a href="#/universities/${u.code}">${u.code}</a></td>
+              <td><a href="#/universities/${u.code}">${escapeHtml(localizedName(u))}</a></td>
+              <td>${u.threshold ?? "—"}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+  }
+  createSearchableSelect(document.getElementById("uni-filter-mount"), {
+    allLabel: t("specialtyDetail.allUniversities"),
+    options: uniOptions,
+    onChange: (value) => drawUniList(value),
+  });
+  drawUniList("");
 }
 
 function renderUniversitiesList(app) {

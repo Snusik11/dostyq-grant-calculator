@@ -143,6 +143,7 @@ nav.site-nav a.active, nav.site-nav a:hover { color: var(--brand); }
 
 h1 { font-size: 1.6rem; margin: 32px 0 8px; }
 h2 { font-size: 1.2rem; margin: 28px 0 12px; }
+h3 { font-size: 0.95rem; margin: 18px 0 8px; color: var(--text-muted); }
 p.lede { color: var(--text-muted); margin-top: 0; }
 
 .card {
