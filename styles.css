@@ -330,6 +330,42 @@ button.primary:focus-visible { outline: 3px solid var(--brand-light); outline-of
 
 .card-link { font-weight: 600; white-space: nowrap; }
 
+/* Вкладки на карточке специальности (мин/макс | кол-во грантов | вузы). */
+.tabs { display: flex; gap: 8px; margin: 20px 0 16px; flex-wrap: wrap; }
+.tab-btn {
+  padding: 9px 18px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tab-btn:hover { border-color: var(--brand); }
+.tab-btn.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+/* Подпись над фильтром-дропдауном. */
+.filter-field { flex: 1; min-width: 200px; }
+.filter-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+.filter-field .select-filter { min-width: 0; }
+
+/* Ровная сетка из 4 фильтров — не даёт четвёртому "повиснуть" одиноко
+   на второй строке при неудачной ширине. */
+.filter-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; align-items: end; }
+@media (max-width: 860px) { .filter-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .filter-grid { grid-template-columns: 1fr; } }
+
+.total-row td { border-top: 2px solid var(--border); }
+
 /* Акцент на проходной балл (порог допуска) в раскрытой строке вуза. */
 .detail-grid .detail-accent b { font-size: 1.5rem; color: var(--brand); }
 
