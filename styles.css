@@ -351,12 +351,13 @@ button.primary:focus-visible { outline: 3px solid var(--brand-light); outline-of
   cursor: pointer;
   list-style: none;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
 }
 .specialty-result-header::-webkit-details-marker { display: none; }
-.specialty-result-main { flex: 1; min-width: 0; }
+.specialty-result-main { flex: 1 1 160px; min-width: 160px; }
 .specialty-result-body { margin-top: 14px; }
 .specialty-result-title { font-family: var(--font-display); font-weight: 800; font-size: 1.05rem; }
 
@@ -466,13 +467,18 @@ table.stat-table th.th-rural { color: var(--quota-rural); }
   cursor: pointer;
   list-style: none;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
 }
 .path-card summary::-webkit-details-marker { display: none; }
 
-.path-main { flex: 1; min-width: 0; }
+/* min-width вместо 0 — иначе на узких экранах название вуза сжималось до
+   "лесенки" в одну букву на строку, а бейджи наезжали на него по центру
+   (align-items:center у родителя). При нехватке места бейджи переносятся
+   на свою строку под названием, а не втискиваются в one line любой ценой. */
+.path-main { flex: 1 1 160px; min-width: 160px; }
 .path-uni { font-weight: 600; font-size: 0.98rem; }
 .path-sub { color: var(--text-muted); font-size: 0.85rem; margin-top: 2px; }
 
@@ -492,7 +498,7 @@ table.stat-table th.th-rural { color: var(--quota-rural); }
 .badge.medium { background: var(--medium-bg); color: var(--medium); }
 .badge.low { background: var(--low-bg); color: var(--low); }
 
-.path-badges { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.path-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .badge-quota {
   display: inline-flex;
   align-items: center;
