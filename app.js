@@ -85,8 +85,11 @@ const I18N = {
     "cutoffTable.median": "Медиана",
     "cutoffTable.winners": "Победителей",
     "cutoffTable.noData": "Нет данных за 2025 год.",
+    "subjects.foreignLanguage": "Иностранный язык",
     "specialtyDetail.subjects": "Профильные предметы: {combo}",
     "specialtyDetail.grants": "Грантов на 2026-2027: {n}",
+    "specialtyDetail.eyebrow": "Специальность (ГОП)",
+    "specialtyDetail.grantsLabel": "Грантов на 2026-2027",
     "specialtyDetail.backLink": "← Все специальности",
     "specialtyDetail.notFound": "Специальность не найдена.",
     "specialtyDetail.minMax": "Мин/макс баллы",
@@ -115,6 +118,7 @@ const I18N = {
     "universitiesList.region": "Регион",
     "universitiesList.dormitory": "Общежитие",
     "universitiesList.militaryDept": "Военная кафедра",
+    "universityDetail.eyebrow": "Вуз",
     "universityDetail.code": "Код ОВПО: {code}",
     "universityDetail.dormitory": "Общежитие: {value}",
     "universityDetail.militaryDept": "Военная кафедра: {value}",
@@ -199,8 +203,11 @@ const I18N = {
     "cutoffTable.median": "Медиана",
     "cutoffTable.winners": "Грант алғандар",
     "cutoffTable.noData": "2025 жылға деректер жоқ.",
+    "subjects.foreignLanguage": "Шет тілі",
     "specialtyDetail.subjects": "Профильді пәндер: {combo}",
     "specialtyDetail.grants": "2026-2027 грант саны: {n}",
+    "specialtyDetail.eyebrow": "Мамандық (ГОП)",
+    "specialtyDetail.grantsLabel": "2026-2027 грант саны",
     "specialtyDetail.backLink": "← Барлық мамандықтар",
     "specialtyDetail.notFound": "Мамандық табылмады.",
     "specialtyDetail.minMax": "Мин/макс баллдар",
@@ -229,6 +236,7 @@ const I18N = {
     "universitiesList.region": "Аймақ",
     "universitiesList.dormitory": "Жатақхана",
     "universitiesList.militaryDept": "Әскери кафедра",
+    "universityDetail.eyebrow": "ЖОО",
     "universityDetail.code": "ОВПО коды: {code}",
     "universityDetail.dormitory": "Жатақхана: {value}",
     "universityDetail.militaryDept": "Әскери кафедра: {value}",
@@ -329,6 +337,29 @@ function localizedSubjectCombos(sp) {
       ? { subject_1: c.subject_1_kk, subject_2: c.subject_2_kk }
       : { subject_1: c.subject_1, subject_2: c.subject_2 }
   ));
+}
+
+// Для 9 специальностей с выбором иностранного языка (англ/нем/фр — B018,
+// B035, B036, B039, B040, B091, B093, B135, B140) показывать все 3 варианта
+// через "/" нечитаемо. Если выбор языка есть — показываем обобщённо
+// "Иностранный язык + X"; если языка нет в выборе (комбинация всего одна) —
+// оставляем конкретное название, как есть.
+const FOREIGN_LANGUAGE_NAMES = new Set([
+  "Английский язык", "Немецкий язык", "Французский язык",
+  "Ағылшын тілі", "Неміс тілі", "Француз тілі",
+]);
+
+function genericSubjectCombos(sp) {
+  const combos = localizedSubjectCombos(sp);
+  const isLangChoice = combos.length > 1 && combos.every(
+    (c) => FOREIGN_LANGUAGE_NAMES.has(c.subject_1) || FOREIGN_LANGUAGE_NAMES.has(c.subject_2)
+  );
+  if (!isLangChoice) return combos;
+  const first = combos[0];
+  const langLabel = t("subjects.foreignLanguage");
+  return FOREIGN_LANGUAGE_NAMES.has(first.subject_1)
+    ? [{ subject_1: langLabel, subject_2: first.subject_2 }]
+    : [{ subject_1: first.subject_1, subject_2: langLabel }];
 }
 
 function localizedSubjectCombo(entity) {
@@ -753,14 +784,14 @@ function grantsTrendNote(countsByYear) {
 function renderSpecialtyResultCard(group) {
   const { code, sp, generalRows, pedRows, pSpecGeneral, pSpecRural, countsByYear } = group;
   const spName = localizedName(sp) || code;
-  const combosText = localizedSubjectCombos(sp).map(formatSubjectCombo).join(" / ");
+  const combos = genericSubjectCombos(sp);
 
   return `
     <details class="specialty-result-card">
       <summary class="specialty-result-header">
         <div class="specialty-result-main">
           <div class="specialty-result-title">${escapeHtml(code)} — ${escapeHtml(spName)}</div>
-          <div class="specialty-result-subjects">${escapeHtml(combosText)}</div>
+          <div class="combo-tags">${combos.map((c) => `<span class="combo-tag">${escapeHtml(formatSubjectCombo(c))}</span>`).join("")}</div>
         </div>
         <div class="path-badges">${quotaBadges(pSpecGeneral, pSpecRural)}</div>
       </summary>
@@ -802,12 +833,14 @@ function mergePathYearly(generalRow, ruralRow) {
 function yearlyQuotaTable(rows) {
   if (!rows.length) return `<p class="hint">${t("cutoffTable.noData")}</p>`;
   return `
+    <div class="table-scroll">
     <table class="stat-table yearly-table">
-      <thead><tr><th>${t("path.year")}</th><th>${t("quota.general")}</th><th>${t("quota.rural")}</th><th>${t("path.winnersCol")}</th></tr></thead>
+      <thead><tr><th>${t("path.year")}</th><th class="th-general">${t("quota.general")}</th><th class="th-rural">${t("quota.rural")}</th><th>${t("path.winnersCol")}</th></tr></thead>
       <tbody>
-        ${rows.map((y) => `<tr><td>${y.year}</td><td>${y.general ? `${y.general.min}–${y.general.max}` : "—"}</td><td>${y.rural ? `${y.rural.min}–${y.rural.max}` : "—"}</td><td>${y.count ?? "—"}</td></tr>`).join("")}
+        ${rows.map((y) => `<tr><td>${y.year}</td><td class="stat-general">${y.general ? `${y.general.min}–${y.general.max}` : "—"}</td><td class="stat-rural">${y.rural ? `${y.rural.min}–${y.rural.max}` : "—"}</td><td>${y.count ?? "—"}</td></tr>`).join("")}
       </tbody>
     </table>
+    </div>
   `;
 }
 
@@ -836,7 +869,7 @@ function renderMergedUniRow(m) {
     <details class="path-card">
       <summary>
         <div class="path-main">
-          <div class="path-uni">${m.university_code} — ${escapeHtml(uniName)}</div>
+          <div class="path-uni">${codeBadge(m.university_code)} ${escapeHtml(uniName)}</div>
           <div class="path-sub">${lowSample ? `<span class="badge-note">${t("path.lowSample")}</span>` : ""}</div>
         </div>
         <div class="path-badges">${quotaBadges(m.pGeneral, m.pRural)}</div>
@@ -862,7 +895,7 @@ function renderPedUniRow(r) {
     <details class="path-card">
       <summary>
         <div class="path-main">
-          <div class="path-uni">${r.university_code} — ${escapeHtml(uniName)}</div>
+          <div class="path-uni">${codeBadge(r.university_code)} ${escapeHtml(uniName)}</div>
         </div>
         <div class="path-badges">${quotaBadges(r.pGeneral, r.pRural)}</div>
       </summary>
@@ -947,18 +980,17 @@ function renderSpecialtiesList(app) {
       return true;
     });
     listEl.innerHTML = `
-      <table class="stat-table">
-        <thead><tr><th>${t("specialtiesList.code")}</th><th>${t("specialtiesList.specialty")}</th><th>${t("specialtiesList.subjects")}</th></tr></thead>
-        <tbody>
-          ${filtered.map(([code, s]) => `
-            <tr>
-              <td><a href="#/specialties/${code}">${code}</a></td>
-              <td><a href="#/specialties/${code}">${escapeHtml(localizedName(s))}</a></td>
-              <td>${localizedSubjectCombos(s).length ? escapeHtml(localizedSubjectCombos(s).map(formatSubjectCombo).join(" / ")) : "—"}</td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
+      <div class="specialty-row-list">
+        ${filtered.map(([code, s]) => `
+          <a href="#/specialties/${code}" class="path-card specialty-row">
+            <div class="specialty-row-code">${code}</div>
+            <div class="specialty-row-body">
+              <div class="specialty-row-name">${escapeHtml(localizedName(s))}</div>
+            </div>
+            <div class="specialty-row-combo">${genericSubjectCombos(s).map((c) => `<span class="combo-tag combo-tag-lg">${escapeHtml(formatSubjectCombo(c))}</span>`).join("")}</div>
+          </a>
+        `).join("")}
+      </div>
     `;
   }
 
@@ -982,8 +1014,31 @@ function labeledFilter(labelKey, mountId) {
   return `<div class="filter-field"><label class="filter-label">${t(labelKey)}</label><div id="${mountId}"></div></div>`;
 }
 
-function uniLink(uniCode, entity) {
-  return `<a href="#/universities/${uniCode}">${uniCode} — ${escapeHtml(localizedName(entity))}</a>`;
+// Код вуза/специальности — отдельным бейджем, чтобы не сливаться с названием
+// в одну строку текста (были жалобы, что таблицы выглядят одним сплошным текстом).
+function codeBadge(code) {
+  return `<span class="code-badge">${code}</span>`;
+}
+
+function regionTag(text) {
+  return text ? `<span class="region-tag">${escapeHtml(text)}</span>` : "—";
+}
+
+// Проходной балл — цветной пилюлей, а не голой цифрой: это главное число
+// в строке таблицы, оно не должно теряться среди обычного текста.
+function scorePill(value) {
+  return value != null ? `<span class="score-pill">${value}</span>` : "—";
+}
+
+const ICON_CHECK = `<svg class="yn-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const ICON_CROSS = `<svg class="yn-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+
+// Иконка + текст вместо голого "есть/нет" — так колонку видно взглядом,
+// не построчным чтением (цвет не единственный носитель смысла, см. текст).
+function ynCell(flag) {
+  return flag
+    ? `<span class="yn yes">${ICON_CHECK}${t("universityDetail.yes")}</span>`
+    : `<span class="yn no">${ICON_CROSS}${t("universityDetail.no")}</span>`;
 }
 
 function renderSpecialtyDetail(app, code) {
@@ -995,7 +1050,6 @@ function renderSpecialtyDetail(app, code) {
   }
   const general = paths.filter((p) => p.gop_code === code && p.quota_id === "general");
   const rural = paths.filter((p) => p.gop_code === code && p.quota_id === "rural");
-  const combosText = localizedSubjectCombos(sp).map(formatSubjectCombo).join(" / ");
 
   const summaryYearly = (sp.general_grant_summary && sp.general_grant_summary.yearly) || [];
   const pedEntries = Object.entries((sp.ped_quota && sp.ped_quota.by_university) || {});
@@ -1006,38 +1060,43 @@ function renderSpecialtyDetail(app, code) {
   const minMaxTab = `
     <h3>${t("results.generalGrant")}</h3>
     ${scoreYears.length ? `
+      <div class="table-scroll">
       <table class="stat-table">
         <thead>
-          <tr><th rowspan="2">${t("path.year")}</th><th colspan="2">${t("quota.general")}</th><th colspan="2">${t("quota.rural")}</th></tr>
+          <tr><th rowspan="2">${t("path.year")}</th><th colspan="2" class="th-general">${t("quota.general")}</th><th colspan="2" class="th-rural">${t("quota.rural")}</th></tr>
           <tr><th>${t("table.min")}</th><th>${t("table.max")}</th><th>${t("table.min")}</th><th>${t("table.max")}</th></tr>
         </thead>
         <tbody>
-          ${scoreYears.map((y) => `<tr><td>${y.year}</td><td>${y.general?.min ?? "—"}</td><td>${y.general?.max ?? "—"}</td><td>${y.rural?.min ?? "—"}</td><td>${y.rural?.max ?? "—"}</td></tr>`).join("")}
+          ${scoreYears.map((y) => `<tr><td>${y.year}</td><td class="stat-general">${y.general?.min ?? "—"}</td><td class="stat-general">${y.general?.max ?? "—"}</td><td class="stat-rural">${y.rural?.min ?? "—"}</td><td class="stat-rural">${y.rural?.max ?? "—"}</td></tr>`).join("")}
         </tbody>
       </table>
+      </div>
     ` : `<p class="hint">${t("cutoffTable.noData")}</p>`}
     ${pedEntries.length ? `
       <h3>${t("results.pedQuota")}</h3>
-      <table class="stat-table">
-        <thead>
-          <tr><th rowspan="2">${t("cutoffTable.university")}</th><th rowspan="2">${t("path.year")}</th><th colspan="2">${t("quota.general")}</th><th colspan="2">${t("quota.rural")}</th></tr>
-          <tr><th>${t("table.min")}</th><th>${t("table.max")}</th><th>${t("table.min")}</th><th>${t("table.max")}</th></tr>
-        </thead>
-        <tbody>
-          ${pedEntries.map(([uniCode, u]) => {
-            const rows = (u.yearly || []).filter((y) => y.general || y.rural);
-            if (!rows.length) return "";
-            return rows.map((y, i) => `
-              <tr>
-                ${i === 0 ? `<td rowspan="${rows.length}">${uniLink(uniCode, { name: u.university_name, name_kk: u.university_name_kk })}</td>` : ""}
-                <td>${y.year}</td>
-                <td>${y.general?.min ?? "—"}</td><td>${y.general?.max ?? "—"}</td>
-                <td>${y.rural?.min ?? "—"}</td><td>${y.rural?.max ?? "—"}</td>
-              </tr>
-            `).join("");
-          }).join("")}
-        </tbody>
-      </table>
+      <div class="uni-stat-list">
+        ${pedEntries.map(([uniCode, u]) => {
+          const rows = (u.yearly || []).filter((y) => y.general || y.rural);
+          if (!rows.length) return "";
+          const uniName = escapeHtml(localizedName({ name: u.university_name, name_kk: u.university_name_kk }));
+          return `
+            <div class="path-card uni-stat-card">
+              <div class="path-uni"><a href="#/universities/${uniCode}">${codeBadge(uniCode)}</a> <a href="#/universities/${uniCode}">${uniName}</a></div>
+              <div class="table-scroll">
+                <table class="stat-table yearly-table">
+                  <thead>
+                    <tr><th rowspan="2">${t("path.year")}</th><th colspan="2" class="th-general">${t("quota.general")}</th><th colspan="2" class="th-rural">${t("quota.rural")}</th></tr>
+                    <tr><th>${t("table.min")}</th><th>${t("table.max")}</th><th>${t("table.min")}</th><th>${t("table.max")}</th></tr>
+                  </thead>
+                  <tbody>
+                    ${rows.map((y) => `<tr><td>${y.year}</td><td class="stat-general">${y.general?.min ?? "—"}</td><td class="stat-general">${y.general?.max ?? "—"}</td><td class="stat-rural">${y.rural?.min ?? "—"}</td><td class="stat-rural">${y.rural?.max ?? "—"}</td></tr>`).join("")}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
     ` : ""}
   `;
 
@@ -1058,28 +1117,31 @@ function renderSpecialtyDetail(app, code) {
   const countsTab = `
     <h3>${t("results.generalGrant")}</h3>
     ${summaryYearly.some((y) => y.count != null) ? `
+      <div class="table-scroll">
       <table class="stat-table">
         <thead><tr><th>${t("path.year")}</th>${countYears.map((y) => `<th>${y}</th>`).join("")}</tr></thead>
-        <tbody><tr><td>${t("results.generalGrant")}</td>${countYears.map((y) => `<td>${summaryYearly.find((e) => e.year === y)?.count ?? "—"}</td>`).join("")}</tr></tbody>
+        <tbody><tr><td>${t("results.generalGrant")}</td>${countYears.map((y) => `<td class="stat-count">${summaryYearly.find((e) => e.year === y)?.count ?? "—"}</td>`).join("")}</tr></tbody>
       </table>
+      </div>
     ` : `<p class="hint">${t("cutoffTable.noData")}</p>`}
     ${pedEntries.length ? `
       <h3>${t("results.pedQuota")}</h3>
-      <table class="stat-table">
-        <thead><tr><th>${t("cutoffTable.university")}</th>${countYears.map((y) => `<th>${y}</th>`).join("")}</tr></thead>
-        <tbody>
-          ${pedEntries.map(([uniCode, u]) => `
-            <tr>
-              <td>${uniLink(uniCode, { name: u.university_name, name_kk: u.university_name_kk })}</td>
-              ${countYears.map((y) => `<td>${(u.yearly || []).find((e) => e.year === y)?.count ?? "—"}</td>`).join("")}
-            </tr>
-          `).join("")}
-          <tr class="total-row">
-            <td><b>${t("table.total")}</b></td>
-            ${countYears.map((y) => `<td><b>${pedTotals[y] ?? "—"}</b></td>`).join("")}
-          </tr>
-        </tbody>
-      </table>
+      <div class="uni-stat-list">
+        ${pedEntries.map(([uniCode, u]) => `
+          <div class="path-card uni-stat-card">
+            <div class="path-uni"><a href="#/universities/${uniCode}">${codeBadge(uniCode)}</a> <a href="#/universities/${uniCode}">${escapeHtml(localizedName({ name: u.university_name, name_kk: u.university_name_kk }))}</a></div>
+            <div class="uni-year-stats">
+              ${countYears.map((y) => `<div><b>${(u.yearly || []).find((e) => e.year === y)?.count ?? "—"}</b><span>${y}</span></div>`).join("")}
+            </div>
+          </div>
+        `).join("")}
+        <div class="path-card uni-stat-card total-card">
+          <div class="path-uni">${t("table.total")}</div>
+          <div class="uni-year-stats">
+            ${countYears.map((y) => `<div><b>${pedTotals[y] ?? "—"}</b><span>${y}</span></div>`).join("")}
+          </div>
+        </div>
+      </div>
       ${general2026 != null ? `<p class="hint">${t("specialtyDetail.totalNote", { g: general2026, p: pedTotals[2026] ?? 0, total: general2026 + (pedTotals[2026] ?? 0) })}</p>` : ""}
     ` : ""}
   `;
@@ -1101,9 +1163,17 @@ function renderSpecialtyDetail(app, code) {
   const uniList = [...uniMap.values()].sort((a, b) => a.code.localeCompare(b.code));
 
   app.innerHTML = `
-    <h1>${code} — ${escapeHtml(localizedName(sp))}</h1>
-    <p class="lede">${combosText ? t("specialtyDetail.subjects", { combo: escapeHtml(combosText) }) : ""}
-      · ${t("specialtyDetail.grants", { n: sp.full_time ?? "—" })}</p>
+    <div class="detail-hero">
+      <div class="detail-hero-eyebrow">${t("specialtyDetail.eyebrow")}</div>
+      <span class="detail-hero-code">${code}</span>
+      <h1>${escapeHtml(localizedName(sp))}</h1>
+      <div class="detail-hero-tags">
+        ${genericSubjectCombos(sp).map((c) => `<span class="detail-hero-tag">${escapeHtml(formatSubjectCombo(c))}</span>`).join("")}
+      </div>
+      <div class="detail-hero-stat">
+        <div><b>${sp.full_time ?? "—"}</b><span>${t("specialtyDetail.grantsLabel")}</span></div>
+      </div>
+    </div>
     <div class="tabs" id="spec-tabs">
       <button class="tab-btn active" data-tab="minmax">${t("specialtyDetail.minMax")}</button>
       <button class="tab-btn" data-tab="counts">${t("specialtyDetail.grantCounts")}</button>
@@ -1142,6 +1212,7 @@ function renderSpecialtyDetail(app, code) {
       (!filterState.military || (filterState.military === "yes") === hasFlag(u.military_department))
     );
     uniListEl.innerHTML = `
+      <div class="table-scroll">
       <table class="stat-table">
         <thead><tr>
           <th>${t("universitiesList.code")}</th><th>${t("cutoffTable.university")}</th>
@@ -1151,16 +1222,17 @@ function renderSpecialtyDetail(app, code) {
         <tbody>
           ${filtered.map((u) => `
             <tr>
-              <td><a href="#/universities/${u.code}">${u.code}</a></td>
+              <td><a href="#/universities/${u.code}">${codeBadge(u.code)}</a></td>
               <td><a href="#/universities/${u.code}">${escapeHtml(localizedName(u))}</a></td>
-              <td>${escapeHtml(localizedRegion(u) || "—")}</td>
-              <td>${hasFlag(u.dormitory) ? t("universityDetail.yes") : t("universityDetail.no")}</td>
-              <td>${hasFlag(u.military_department) ? t("universityDetail.yes") : t("universityDetail.no")}</td>
-              <td>${u.threshold ?? "—"}</td>
+              <td>${regionTag(localizedRegion(u))}</td>
+              <td>${ynCell(hasFlag(u.dormitory))}</td>
+              <td>${ynCell(hasFlag(u.military_department))}</td>
+              <td class="num">${scorePill(u.threshold)}</td>
             </tr>
           `).join("")}
         </tbody>
       </table>
+      </div>
     `;
   }
 
@@ -1237,6 +1309,7 @@ function renderUniversitiesList(app) {
       (!filterState.military || (filterState.military === "yes") === hasFlag(u.military_department))
     );
     listEl.innerHTML = `
+      <div class="table-scroll">
       <table class="stat-table">
         <thead><tr>
           <th>${t("universitiesList.code")}</th>
@@ -1248,15 +1321,16 @@ function renderUniversitiesList(app) {
         <tbody>
           ${filtered.map((u) => `
             <tr>
-              <td><a href="#/universities/${u.code}">${u.code}</a></td>
+              <td><a href="#/universities/${u.code}">${codeBadge(u.code)}</a></td>
               <td><a href="#/universities/${u.code}">${escapeHtml(localizedName(u))}</a></td>
-              <td>${escapeHtml(localizedRegion(u) || "—")}</td>
-              <td>${hasFlag(u.dormitory) ? t("universityDetail.yes") : t("universityDetail.no")}</td>
-              <td>${hasFlag(u.military_department) ? t("universityDetail.yes") : t("universityDetail.no")}</td>
+              <td>${regionTag(localizedRegion(u))}</td>
+              <td>${ynCell(hasFlag(u.dormitory))}</td>
+              <td>${ynCell(hasFlag(u.military_department))}</td>
             </tr>
           `).join("")}
         </tbody>
       </table>
+      </div>
     `;
   }
 
@@ -1324,13 +1398,21 @@ function renderUniversityDetail(app, code) {
   const comboOptions = [...new Map(
     specRows.filter((r) => r.sp.subject_combo).map((r) => [comboKeyOf(r.sp), {
       value: comboKeyOf(r.sp),
-      label: localizedSubjectCombos(r.sp).map(formatSubjectCombo).join(" / "),
+      label: genericSubjectCombos(r.sp).map(formatSubjectCombo).join(" / "),
     }])
   ).values()].sort((a, b) => a.label.localeCompare(b.label, "ru"));
 
   app.innerHTML = `
-    <h1>${escapeHtml(localizedName(uni))}</h1>
-    <p class="lede">${t("universityDetail.code", { code: uni.code })}${localizedRegion(uni) ? ` · ${escapeHtml(localizedRegion(uni))}` : ""}${dormText ? ` · ${dormText}` : ""}${militaryText ? ` · ${militaryText}` : ""}</p>
+    <div class="detail-hero">
+      <div class="detail-hero-eyebrow">${t("universityDetail.eyebrow")}</div>
+      <span class="detail-hero-code">${uni.code}</span>
+      <h1>${escapeHtml(localizedName(uni))}</h1>
+      <div class="detail-hero-tags">
+        ${localizedRegion(uni) ? `<span class="detail-hero-tag">${escapeHtml(localizedRegion(uni))}</span>` : ""}
+        ${dormText ? `<span class="detail-hero-tag">${dormText}</span>` : ""}
+        ${militaryText ? `<span class="detail-hero-tag">${militaryText}</span>` : ""}
+      </div>
+    </div>
     <div class="result-controls filter-grid">
       ${labeledFilter("filter.specialty", "specialty-filter-mount")}
       ${labeledFilter("filter.combo", "combo-filter-mount")}
@@ -1343,7 +1425,7 @@ function renderUniversityDetail(app, code) {
   const filterState = { specialty: "", combo: "" };
 
   function specRowHtml(r) {
-    const combosText = localizedSubjectCombos(r.sp).map(formatSubjectCombo).join(" / ");
+    const combos = genericSubjectCombos(r.sp);
     const yearlyRows = mergePathYearly(r.general, r.rural);
     const base = r.general || r.rural;
     const lastYear = base?.data_years ? base.data_years[base.data_years.length - 1] : null;
@@ -1351,11 +1433,11 @@ function renderUniversityDetail(app, code) {
       <details class="path-card">
         <summary>
           <div class="path-main">
-            <div class="path-uni">${r.gop} — ${escapeHtml(localizedName(r.sp))}</div>
-            <div class="path-sub">${escapeHtml(combosText)}</div>
+            <div class="path-uni">${codeBadge(r.gop)} ${escapeHtml(localizedName(r.sp))}</div>
+            <div class="combo-tags">${combos.map((c) => `<span class="combo-tag">${escapeHtml(formatSubjectCombo(c))}</span>`).join("")}</div>
           </div>
           <div class="path-badges">
-            <span class="badge-note">${t("path.thresholdCol")}: <b>${r.threshold ?? "—"}</b></span>
+            <span class="path-threshold">${t("path.thresholdCol")}: ${scorePill(r.threshold)}</span>
           </div>
         </summary>
         <div class="path-details">
@@ -1397,10 +1479,13 @@ function renderUniversityDetail(app, code) {
 
 // ---------- Тема ----------
 
+const ICON_SUN = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="1.8"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2.5v2.5M12 19v2.5M21.5 12H19M5 12H2.5M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8M18.4 18.4l-1.8-1.8M7.4 7.4L5.6 5.6"/></g></svg>`;
+const ICON_MOON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" fill="currentColor"/></svg>`;
+
 function applyTheme(theme) {
   const btn = document.getElementById("theme-toggle");
   document.documentElement.dataset.theme = theme;
-  btn.textContent = theme === "dark" ? "☀️" : "🌙";
+  btn.innerHTML = theme === "dark" ? ICON_SUN : ICON_MOON;
   btn.title = theme === "dark" ? t("theme.toLight") : t("theme.toDark");
 }
 
