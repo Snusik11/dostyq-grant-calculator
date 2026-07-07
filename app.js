@@ -377,7 +377,17 @@ function localizedSubjectCombo(entity) {
 // calculatorInput переживает re-render (переход на другую страницу и назад,
 // смена языка) — иначе render() каждый раз строит калькулятор с чистого
 // листа и пользователь теряет введённые балл/комбинацию/результаты.
-const state = { data: null, calculatorInput: null };
+// filters — то же самое для дропдаунов-фильтров на страницах списков/карточек
+// (по key страницы, у деталей специальности/вуза — с кодом в key, чтобы
+// фильтры одной специальности не подмешивались к другой).
+const state = { data: null, calculatorInput: null, filters: {} };
+
+// Возвращает персистентный объект фильтров для страницы (создаёт при первом
+// обращении) — тот же объект переживает re-render, а не пересоздаётся с нуля.
+function filterState(key, defaults) {
+  if (!state.filters[key]) state.filters[key] = { ...defaults };
+  return state.filters[key];
+}
 
 async function loadData() {
   const entries = await Promise.all(
@@ -411,15 +421,19 @@ function probabilityAt(curve, score) {
 // своим поисковым полем и списком вариантов ("Все ..." + опции). В отличие
 // от текстового автокомплита, это ДИСКРЕТНЫЙ фильтр — выбор одного значения
 // сужает список результатов ровно до него, а не просто подсказывает.
-function createSearchableSelect(mount, { allLabel, options, onChange }) {
-  let selectedValue = "";
+function createSearchableSelect(mount, { allLabel, options, onChange, value = "" }) {
+  // value — уже выбранное значение (восстановление после re-render): виджет
+  // сразу открывается с правильной подписью, onChange НЕ дёргается заново,
+  // т.к. вызывающий код уже держит это значение в своём filterState.
+  let selectedValue = value;
   let open = false;
+  const initialOption = selectedValue ? options.find((o) => o.value === selectedValue) : null;
 
   const root = document.createElement("div");
   root.className = "select-filter";
   root.innerHTML = `
     <button type="button" class="select-filter-trigger">
-      <span class="select-filter-label">${escapeHtml(allLabel)}</span>
+      <span class="select-filter-label">${escapeHtml(initialOption ? initialOption.label : allLabel)}</span>
       <span class="select-filter-arrow">▾</span>
     </button>
     <div class="select-filter-panel" hidden>
@@ -747,15 +761,15 @@ function renderResults(container, { comboKey, score, rural, otherQuotas }) {
     .map((g) => ({ value: g.code, label: `${g.code} — ${localizedName(g.sp)}` }))
     .sort((a, b) => a.label.localeCompare(b.label, "ru"));
 
-  const filterState = { university: "", specialty: "" };
+  const fs = filterState("results", { university: "", specialty: "" });
 
   function draw() {
     const filtered = specialtyGroups
-      .filter((g) => !filterState.specialty || g.code === filterState.specialty)
+      .filter((g) => !fs.specialty || g.code === fs.specialty)
       .map((g) => ({
         ...g,
-        generalRows: filterState.university ? g.generalRows.filter((r) => r.university_code === filterState.university) : g.generalRows,
-        pedRows: filterState.university ? g.pedRows.filter((r) => r.university_code === filterState.university) : g.pedRows,
+        generalRows: fs.university ? g.generalRows.filter((r) => r.university_code === fs.university) : g.generalRows,
+        pedRows: fs.university ? g.pedRows.filter((r) => r.university_code === fs.university) : g.pedRows,
       }))
       .filter((g) => g.generalRows.length > 0 || g.pedRows.length > 0);
 
@@ -768,12 +782,14 @@ function renderResults(container, { comboKey, score, rural, otherQuotas }) {
   createSearchableSelect(document.getElementById("university-filter-mount"), {
     allLabel: t("results.allUniversities"),
     options: universityOptions,
-    onChange: (value) => { filterState.university = value; draw(); },
+    value: fs.university,
+    onChange: (value) => { fs.university = value; draw(); },
   });
   createSearchableSelect(document.getElementById("specialty-filter-mount"), {
     allLabel: t("results.allSpecialties"),
     options: specialtyOptions,
-    onChange: (value) => { filterState.specialty = value; draw(); },
+    value: fs.specialty,
+    onChange: (value) => { fs.specialty = value; draw(); },
   });
 
   draw();
@@ -989,15 +1005,15 @@ function renderSpecialtiesList(app) {
     </div>
   `;
   const listEl = document.getElementById("list");
-  const filterState = { specialty: "", combo: "" };
+  const fs = filterState("specialtiesList", { specialty: "", combo: "" });
 
   function draw() {
     const filtered = items.filter(([code, s]) => {
-      if (filterState.specialty && code !== filterState.specialty) return false;
-      if (filterState.combo) {
+      if (fs.specialty && code !== fs.specialty) return false;
+      if (fs.combo) {
         const combo = s.subject_combo;
         const key = combo ? [combo.subject_1, combo.subject_2].sort().join("|") : "";
-        if (key !== filterState.combo) return false;
+        if (key !== fs.combo) return false;
       }
       return true;
     });
@@ -1019,12 +1035,14 @@ function renderSpecialtiesList(app) {
   createSearchableSelect(document.getElementById("specialty-filter-mount"), {
     allLabel: t("specialtiesList.allSpecialties"),
     options: specialtyOptions,
-    onChange: (value) => { filterState.specialty = value; draw(); },
+    value: fs.specialty,
+    onChange: (value) => { fs.specialty = value; draw(); },
   });
   createSearchableSelect(document.getElementById("combo-filter-mount"), {
     allLabel: t("specialtiesList.allSubjects"),
     options: comboOptions,
-    onChange: (value) => { filterState.combo = value; draw(); },
+    value: fs.combo,
+    onChange: (value) => { fs.combo = value; draw(); },
   });
 
   draw();
@@ -1223,15 +1241,15 @@ function renderSpecialtyDetail(app, code) {
   });
 
   const uniListEl = document.getElementById("uni-list");
-  const filterState = { university: "", region: "", dormitory: "", military: "" };
+  const fs = filterState(`specialtyDetailUnis:${code}`, { university: "", region: "", dormitory: "", military: "" });
   const hasFlag = (v) => v === "Иә";
 
   function drawUniList() {
     const filtered = uniList.filter((u) =>
-      (!filterState.university || u.code === filterState.university) &&
-      (!filterState.region || u.region === filterState.region) &&
-      (!filterState.dormitory || (filterState.dormitory === "yes") === hasFlag(u.dormitory)) &&
-      (!filterState.military || (filterState.military === "yes") === hasFlag(u.military_department))
+      (!fs.university || u.code === fs.university) &&
+      (!fs.region || u.region === fs.region) &&
+      (!fs.dormitory || (fs.dormitory === "yes") === hasFlag(u.dormitory)) &&
+      (!fs.military || (fs.military === "yes") === hasFlag(u.military_department))
     );
     uniListEl.innerHTML = `
       <div class="table-scroll">
@@ -1269,22 +1287,26 @@ function renderSpecialtyDetail(app, code) {
   createSearchableSelect(document.getElementById("uni-filter-mount"), {
     allLabel: t("specialtyDetail.allUniversities"),
     options: uniList.map((u) => ({ value: u.code, label: localizedName(u), showCode: true })),
-    onChange: (v) => { filterState.university = v; drawUniList(); },
+    value: fs.university,
+    onChange: (v) => { fs.university = v; drawUniList(); },
   });
   createSearchableSelect(document.getElementById("region-filter-mount"), {
     allLabel: t("universitiesList.allRegions"),
     options: [...regionByKey.entries()].sort((a, b) => a[1].localeCompare(b[1], "ru")).map(([key, label]) => ({ value: key, label })),
-    onChange: (v) => { filterState.region = v; drawUniList(); },
+    value: fs.region,
+    onChange: (v) => { fs.region = v; drawUniList(); },
   });
   createSearchableSelect(document.getElementById("dorm-filter-mount"), {
     allLabel: t("filter.any"),
     options: yesNoOptions,
-    onChange: (v) => { filterState.dormitory = v; drawUniList(); },
+    value: fs.dormitory,
+    onChange: (v) => { fs.dormitory = v; drawUniList(); },
   });
   createSearchableSelect(document.getElementById("military-filter-mount"), {
     allLabel: t("filter.any"),
     options: yesNoOptions,
-    onChange: (v) => { filterState.military = v; drawUniList(); },
+    value: fs.military,
+    onChange: (v) => { fs.military = v; drawUniList(); },
   });
   drawUniList();
 }
@@ -1321,14 +1343,14 @@ function renderUniversitiesList(app) {
     </div>
   `;
   const listEl = document.getElementById("list");
-  const filterState = { university: "", region: "", dormitory: "", military: "" };
+  const fs = filterState("universitiesList", { university: "", region: "", dormitory: "", military: "" });
 
   function draw() {
     const filtered = items.filter((u) =>
-      (!filterState.university || u.code === filterState.university) &&
-      (!filterState.region || u.region === filterState.region) &&
-      (!filterState.dormitory || (filterState.dormitory === "yes") === hasFlag(u.dormitory)) &&
-      (!filterState.military || (filterState.military === "yes") === hasFlag(u.military_department))
+      (!fs.university || u.code === fs.university) &&
+      (!fs.region || u.region === fs.region) &&
+      (!fs.dormitory || (fs.dormitory === "yes") === hasFlag(u.dormitory)) &&
+      (!fs.military || (fs.military === "yes") === hasFlag(u.military_department))
     );
     listEl.innerHTML = `
       <div class="table-scroll">
@@ -1359,22 +1381,26 @@ function renderUniversitiesList(app) {
   createSearchableSelect(document.getElementById("university-filter-mount"), {
     allLabel: t("universitiesList.allUniversities"),
     options: universityOptions,
-    onChange: (value) => { filterState.university = value; draw(); },
+    value: fs.university,
+    onChange: (value) => { fs.university = value; draw(); },
   });
   createSearchableSelect(document.getElementById("region-filter-mount"), {
     allLabel: t("universitiesList.allRegions"),
     options: regionOptions,
-    onChange: (value) => { filterState.region = value; draw(); },
+    value: fs.region,
+    onChange: (value) => { fs.region = value; draw(); },
   });
   createSearchableSelect(document.getElementById("dorm-filter-mount"), {
     allLabel: t("filter.any"),
     options: yesNoOptions,
-    onChange: (value) => { filterState.dormitory = value; draw(); },
+    value: fs.dormitory,
+    onChange: (value) => { fs.dormitory = value; draw(); },
   });
   createSearchableSelect(document.getElementById("military-filter-mount"), {
     allLabel: t("filter.any"),
     options: yesNoOptions,
-    onChange: (value) => { filterState.military = value; draw(); },
+    value: fs.military,
+    onChange: (value) => { fs.military = value; draw(); },
   });
 
   draw();
@@ -1444,7 +1470,7 @@ function renderUniversityDetail(app, code) {
   `;
 
   const listEl = document.getElementById("specialty-list");
-  const filterState = { specialty: "", combo: "" };
+  const fs = filterState(`universityDetailSpecs:${code}`, { specialty: "", combo: "" });
 
   function specRowHtml(r) {
     const combos = genericSubjectCombos(r.sp);
@@ -1476,8 +1502,8 @@ function renderUniversityDetail(app, code) {
 
   function draw() {
     const filtered = specRows.filter((r) =>
-      (!filterState.specialty || r.gop === filterState.specialty) &&
-      (!filterState.combo || comboKeyOf(r.sp) === filterState.combo)
+      (!fs.specialty || r.gop === fs.specialty) &&
+      (!fs.combo || comboKeyOf(r.sp) === fs.combo)
     );
     listEl.innerHTML = filtered.length
       ? filtered.map(specRowHtml).join("")
@@ -1487,12 +1513,14 @@ function renderUniversityDetail(app, code) {
   createSearchableSelect(document.getElementById("specialty-filter-mount"), {
     allLabel: t("specialtiesList.allSpecialties"),
     options: specRows.map((r) => ({ value: r.gop, label: `${r.gop} — ${localizedName(r.sp)}` })),
-    onChange: (v) => { filterState.specialty = v; draw(); },
+    value: fs.specialty,
+    onChange: (v) => { fs.specialty = v; draw(); },
   });
   createSearchableSelect(document.getElementById("combo-filter-mount"), {
     allLabel: t("specialtiesList.allSubjects"),
     options: comboOptions,
-    onChange: (v) => { filterState.combo = v; draw(); },
+    value: fs.combo,
+    onChange: (v) => { fs.combo = v; draw(); },
   });
   draw();
 }
