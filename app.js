@@ -374,7 +374,10 @@ function localizedSubjectCombo(entity) {
   return entity.subject_combo || null;
 }
 
-const state = { data: null };
+// calculatorInput переживает re-render (переход на другую страницу и назад,
+// смена языка) — иначе render() каждый раз строит калькулятор с чистого
+// листа и пользователь теряет введённые балл/комбинацию/результаты.
+const state = { data: null, calculatorInput: null };
 
 async function loadData() {
   const entries = await Promise.all(
@@ -616,8 +619,24 @@ function renderCalculator(app) {
     const score = parseFloat(document.getElementById("score-input").value);
     const rural = document.getElementById("rural-checkbox").checked;
     const otherQuotas = [...document.querySelectorAll(".other-quota:checked")].map((el) => el.value);
-    renderResults(document.getElementById("results"), { comboKey, score, rural, otherQuotas });
+    state.calculatorInput = { comboKey, score, rural, otherQuotas };
+    renderResults(document.getElementById("results"), state.calculatorInput);
   });
+
+  // Восстанавливаем форму и результаты после re-render (переход на страницу
+  // вуза/специальности и назад, смена языка) — без этого calculatorInput
+  // выше был бы бесполезен, форма просто оставалась бы пустой.
+  if (state.calculatorInput) {
+    const { comboKey, score, rural, otherQuotas } = state.calculatorInput;
+    document.getElementById("combo-select").value = comboKey;
+    document.getElementById("score-input").value = score;
+    document.getElementById("rural-checkbox").checked = rural;
+    otherQuotas.forEach((id) => {
+      const el = document.getElementById(`q-${id}`);
+      if (el) el.checked = true;
+    });
+    renderResults(document.getElementById("results"), state.calculatorInput);
+  }
 }
 
 function renderResults(container, { comboKey, score, rural, otherQuotas }) {
