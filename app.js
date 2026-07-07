@@ -386,6 +386,9 @@ async function loadData() {
 }
 
 function pct(p) {
+  // Не даём ненулевым, но малым шансам округляться до обманчивого "0%".
+  if (p > 0 && p * 100 < 1) return "<1%";
+  if (p < 1 && p * 100 > 99) return ">99%";
   return `${Math.round(p * 100)}%`;
 }
 
