@@ -43,6 +43,7 @@ const I18N = {
     "results.generalGrant": "Общий грант",
     "results.pedQuota": "Педагогическая квота",
     "results.thresholdFiltered": "Показаны только вузы, куда твой балл проходит по порогу допуска.",
+    "results.availableUnis": "{available}/{total} вузов доступно",
     "path.thresholdLabel": "проходной балл (допуск к конкурсу)",
     "path.lastYearMin": "мин. балл победителя {year}",
     "btn.uniCard": "Карточка вуза →",
@@ -161,6 +162,7 @@ const I18N = {
     "results.generalGrant": "Жалпы грант",
     "results.pedQuota": "Педагогикалық квота",
     "results.thresholdFiltered": "Тек балың рұқсат шегінен өтетін ЖОО-лар көрсетілген.",
+    "results.availableUnis": "{available}/{total} ЖОО қолжетімді",
     "path.thresholdLabel": "өту балы (конкурсқа рұқсат)",
     "path.lastYearMin": "{year} жылғы жеңімпаздың мин. балы",
     "btn.uniCard": "ЖОО картасы →",
@@ -735,24 +737,26 @@ function renderResults(container, { comboKey, score, rural, otherQuotas }) {
 
     if (generalRows.length === 0 && pedRows.length === 0) continue;
 
-    // Процент самой специальности — по агрегатному порогу общего гранта
-    // (кривая предпосчитана на уровне специальности в build_dataset.py).
-    const pSpecGeneral = sp.probability_curve_general ? probabilityAt(sp.probability_curve_general, score) : null;
-    const pSpecRural = rural && sp.probability_curve_rural ? probabilityAt(sp.probability_curve_rural, score) : null;
+    // Заголовочный процент специальности — НЕ отдельная предпосчитанная
+    // кривая по всем вузам сразу (та, слитая в один пул, могла давать
+    // 89% в заголовке при 32% у каждого реально видимого вуза — пул
+    // тянет исторический минимум с любого, даже давно неактуального вуза).
+    // Вместо этого — лучший результат СРЕДИ РЕАЛЬНО ВИДИМЫХ (прошедших
+    // порог допуска) вузов, ровно то же число, что видно при раскрытии.
+    const bestGeneral = generalRows.length ? Math.max(...generalRows.map((r) => r.pGeneral ?? 0)) : null;
+    const bestRural = rural && generalRows.length ? Math.max(...generalRows.map((r) => r.pRural ?? 0)) : null;
+    const availableCount = generalRows.length;
+    const totalCount = byUni.size;
 
     // Тренд числа грантов — свойство специальности (грант выделяется на неё),
     // показывается один раз в шапке, не в каждом вузе.
     const summaryYearly = (sp.general_grant_summary && sp.general_grant_summary.yearly) || [];
     const countsByYear = Object.fromEntries(summaryYearly.filter((y) => y.count != null).map((y) => [y.year, y.count]));
 
-    specialtyGroups.push({ code, sp, generalRows, pedRows, pSpecGeneral, pSpecRural, countsByYear });
+    specialtyGroups.push({ code, sp, generalRows, pedRows, bestGeneral, bestRural, availableCount, totalCount, countsByYear });
   }
-  // Сортировка обязана совпадать с тем, что реально написано на бейдже
-  // карточки (quotaBadges(pSpecGeneral, pSpecRural) в renderSpecialtyResultCard)
-  // — раньше сюда подмешивался ещё и bestP (лучший % среди вузов ВНУТРИ
-  // специальности, нигде не показанный), из-за чего порядок карточек не
-  // совпадал с их видимыми процентами.
-  specialtyGroups.sort((a, b) => Math.max(b.pSpecGeneral ?? 0, b.pSpecRural ?? 0) - Math.max(a.pSpecGeneral ?? 0, a.pSpecRural ?? 0));
+  // Сортировка обязана совпадать с тем, что реально написано на бейдже.
+  specialtyGroups.sort((a, b) => Math.max(b.bestGeneral ?? 0, b.bestRural ?? 0) - Math.max(a.bestGeneral ?? 0, a.bestRural ?? 0));
 
   if (specialtyGroups.length === 0) {
     container.innerHTML = `<div class="empty-state">${t("results.emptyCombo")}</div>`;
@@ -845,7 +849,7 @@ function grantsTrendNote(countsByYear) {
 }
 
 function renderSpecialtyResultCard(group) {
-  const { code, sp, generalRows, pedRows, pSpecGeneral, pSpecRural, countsByYear } = group;
+  const { code, sp, generalRows, pedRows, bestGeneral, bestRural, availableCount, totalCount, countsByYear } = group;
   const spName = localizedName(sp) || code;
   const combos = genericSubjectCombos(sp);
 
@@ -856,10 +860,10 @@ function renderSpecialtyResultCard(group) {
           <div class="specialty-result-title">${escapeHtml(code)} — ${escapeHtml(spName)}</div>
           <div class="combo-tags">${combos.map((c) => `<span class="combo-tag">${escapeHtml(formatSubjectCombo(c))}</span>`).join("")}</div>
         </div>
-        <div class="path-badges">${quotaBadges(pSpecGeneral, pSpecRural)}</div>
+        <div class="path-badges">${quotaBadges(bestGeneral, bestRural)}</div>
       </summary>
       <div class="specialty-result-body">
-        <p class="hint">${grantsTrendNote(countsByYear)} <a class="card-link" href="#/specialties/${encodeURIComponent(code)}">${t("btn.specCard")}</a></p>
+        <p class="hint">${t("results.availableUnis", { available: availableCount, total: totalCount })} · ${grantsTrendNote(countsByYear)} <a class="card-link" href="#/specialties/${encodeURIComponent(code)}">${t("btn.specCard")}</a></p>
         ${generalRows.length ? `
           <div class="grant-pool">
             <h3 class="grant-pool-title">${t("results.generalGrant")}</h3>
