@@ -745,12 +745,14 @@ function renderResults(container, { comboKey, score, rural, otherQuotas }) {
     const summaryYearly = (sp.general_grant_summary && sp.general_grant_summary.yearly) || [];
     const countsByYear = Object.fromEntries(summaryYearly.filter((y) => y.count != null).map((y) => [y.year, y.count]));
 
-    const bestP = Math.max(pSpecGeneral ?? 0, pSpecRural ?? 0,
-      ...generalRows.map((r) => Math.max(r.pGeneral ?? 0, r.pRural ?? 0)),
-      ...pedRows.map((r) => Math.max(r.pGeneral ?? 0, r.pRural ?? 0)));
-    specialtyGroups.push({ code, sp, generalRows, pedRows, pSpecGeneral, pSpecRural, countsByYear, bestP });
+    specialtyGroups.push({ code, sp, generalRows, pedRows, pSpecGeneral, pSpecRural, countsByYear });
   }
-  specialtyGroups.sort((a, b) => Math.max(b.pSpecGeneral ?? 0, b.pSpecRural ?? 0, b.bestP) - Math.max(a.pSpecGeneral ?? 0, a.pSpecRural ?? 0, a.bestP));
+  // Сортировка обязана совпадать с тем, что реально написано на бейдже
+  // карточки (quotaBadges(pSpecGeneral, pSpecRural) в renderSpecialtyResultCard)
+  // — раньше сюда подмешивался ещё и bestP (лучший % среди вузов ВНУТРИ
+  // специальности, нигде не показанный), из-за чего порядок карточек не
+  // совпадал с их видимыми процентами.
+  specialtyGroups.sort((a, b) => Math.max(b.pSpecGeneral ?? 0, b.pSpecRural ?? 0) - Math.max(a.pSpecGeneral ?? 0, a.pSpecRural ?? 0));
 
   if (specialtyGroups.length === 0) {
     container.innerHTML = `<div class="empty-state">${t("results.emptyCombo")}</div>`;
