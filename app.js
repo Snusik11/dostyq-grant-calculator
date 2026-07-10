@@ -320,7 +320,7 @@ function buildSubjectComboKkIndex(specialties) {
   for (const code in specialties) {
     const s = specialties[code];
     if (!s.subject_combo || !s.subject_combo_kk) continue;
-    const key = [s.subject_combo.subject_1, s.subject_combo.subject_2].sort().join("|");
+    const key = subjectComboKey(s.subject_combo.subject_1, s.subject_combo.subject_2);
     if (!index.has(key)) index.set(key, s.subject_combo_kk);
   }
   return index;
@@ -349,6 +349,23 @@ const FOREIGN_LANGUAGE_NAMES = new Set([
   "Ағылшын тілі", "Неміс тілі", "Француз тілі",
 ]);
 
+// Английский/Немецкий/Французский язык и обобщённый "Иностранный язык"/
+// "Шет тілі" — один и тот же смысл комбинации для фильтров и группировки:
+// студенту всё равно, на каком конкретно языке он сдавал экзамен, у него
+// должен быть один пункт в фильтре, а не 4 отдельных (см. subjectComboKey,
+// используется везде, где строится ключ комбинации — иначе часть
+// специальностей находится по 'Ағылшын тілі + X', а часть по 'Шет тілі + X').
+const LANGUAGE_KEY_NAMES = new Set([...FOREIGN_LANGUAGE_NAMES, "Иностранный язык", "Шет тілі"]);
+const CANONICAL_LANGUAGE_RU = "Иностранный язык";
+
+function canonicalSubject(name) {
+  return LANGUAGE_KEY_NAMES.has(name) ? CANONICAL_LANGUAGE_RU : name;
+}
+
+function subjectComboKey(subject1, subject2) {
+  return [canonicalSubject(subject1), canonicalSubject(subject2)].sort().join("|");
+}
+
 function genericSubjectCombos(sp) {
   const combos = localizedSubjectCombos(sp);
   const isLangChoice = combos.length > 1 && combos.every(
@@ -367,7 +384,7 @@ function localizedSubjectCombo(entity) {
   if (LANG !== "kk") return entity.subject_combo || null;
   if (entity.subject_combo_kk) return entity.subject_combo_kk;
   if (entity.subject_combo && SUBJECT_COMBO_KK_BY_KEY) {
-    const key = [entity.subject_combo.subject_1, entity.subject_combo.subject_2].sort().join("|");
+    const key = subjectComboKey(entity.subject_combo.subject_1, entity.subject_combo.subject_2);
     const fallback = SUBJECT_COMBO_KK_BY_KEY.get(key);
     if (fallback) return fallback;
   }
@@ -524,11 +541,17 @@ function buildSubjectCombos(specialties) {
   for (const code in specialties) {
     const combo = specialties[code].subject_combo;
     if (!combo) continue;
-    const key = [combo.subject_1, combo.subject_2].sort().join("|");
-    if (!seen.has(key)) {
-      const localized = localizedSubjectCombo(specialties[code]);
-      seen.set(key, { key, a: localized.subject_1, b: localized.subject_2 });
-    }
+    const key = subjectComboKey(combo.subject_1, combo.subject_2);
+    if (seen.has(key)) continue;
+    const localized = localizedSubjectCombo(specialties[code]);
+    // Конкретный язык (Английский/Немецкий/Французский) в подписи заменяем на
+    // обобщённый "Иностранный язык"/"Шет тілі" — иначе какая именно
+    // специальность встретилась первой при переборе решала бы, покажем ли мы
+    // "+ Ағылшын тілі" или "+ Шет тілі", хотя после subjectComboKey это один
+    // и тот же пункт фильтра.
+    const a = FOREIGN_LANGUAGE_NAMES.has(combo.subject_1) ? t("subjects.foreignLanguage") : localized.subject_1;
+    const b = FOREIGN_LANGUAGE_NAMES.has(combo.subject_2) ? t("subjects.foreignLanguage") : localized.subject_2;
+    seen.set(key, { key, a, b });
   }
   return [...seen.values()].sort((x, y) => `${x.a}${x.b}`.localeCompare(`${y.a}${y.b}`, "ru"));
 }
@@ -537,7 +560,7 @@ function specialtiesForCombo(specialties, comboKey) {
   return Object.entries(specialties)
     .filter(([, s]) => {
       if (!s.subject_combo) return false;
-      const key = [s.subject_combo.subject_1, s.subject_combo.subject_2].sort().join("|");
+      const key = subjectComboKey(s.subject_combo.subject_1, s.subject_combo.subject_2);
       return key === comboKey;
     })
     .map(([code]) => code);
@@ -1012,7 +1035,7 @@ function renderSpecialtiesList(app) {
       if (fs.specialty && code !== fs.specialty) return false;
       if (fs.combo) {
         const combo = s.subject_combo;
-        const key = combo ? [combo.subject_1, combo.subject_2].sort().join("|") : "";
+        const key = combo ? subjectComboKey(combo.subject_1, combo.subject_2) : "";
         if (key !== fs.combo) return false;
       }
       return true;
@@ -1441,7 +1464,7 @@ function renderUniversityDetail(app, code) {
 
   const comboKeyOf = (sp) => {
     const c = sp.subject_combo;
-    return c ? [c.subject_1, c.subject_2].sort().join("|") : "";
+    return c ? subjectComboKey(c.subject_1, c.subject_2) : "";
   };
   const comboOptions = [...new Map(
     specRows.filter((r) => r.sp.subject_combo).map((r) => [comboKeyOf(r.sp), {
