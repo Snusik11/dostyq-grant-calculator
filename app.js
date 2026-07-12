@@ -981,11 +981,13 @@ function renderSpecialtyResultCard(group) {
 function mergePathYearly(generalRow, ruralRow) {
   const byYear = new Map();
   for (const y of (generalRow?.yearly || [])) {
-    byYear.set(y.year, { year: y.year, general: { min: y.min, max: y.max }, rural: null, count: y.count });
+    // y.min == null — год без баллов (напр. план приёма 2026-2027, приём
+    // ещё не прошёл, только count) — не рисуем "null–null" в колонке min-max.
+    byYear.set(y.year, { year: y.year, general: y.min != null ? { min: y.min, max: y.max } : null, rural: null, count: y.count });
   }
   for (const y of (ruralRow?.yearly || [])) {
     const e = byYear.get(y.year) || { year: y.year, general: null, rural: null, count: 0 };
-    e.rural = { min: y.min, max: y.max };
+    if (y.min != null) e.rural = { min: y.min, max: y.max };
     e.count = (e.count || 0) + y.count;
     byYear.set(y.year, e);
   }
