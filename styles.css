@@ -19,6 +19,14 @@
   --quota-general-bg: var(--brand-light);
   --quota-rural: #8a5a3a;
   --quota-rural-bg: #f2e6da;
+  --quota-ped: #1f7a5c;
+  --quota-ped-bg: #e3f3ec;
+  --quota-tech: #3457a6;
+  --quota-tech-bg: #e6ebf7;
+  --quota-western: #b5502e;
+  --quota-western-bg: #f7e3da;
+  --quota-serpin: #6b3fa0;
+  --quota-serpin-bg: #ede4f7;
   --combo: #3f7a52;
   --combo-bg: #e3f0e6;
   --radius: 12px;
@@ -47,6 +55,14 @@
   --low-bg: #3a1a1a;
   --quota-rural: #d9a373;
   --quota-rural-bg: #3d2d1f;
+  --quota-ped: #4fc9a0;
+  --quota-ped-bg: #143d30;
+  --quota-tech: #7fa0e0;
+  --quota-tech-bg: #1c2c4a;
+  --quota-western: #e08a5c;
+  --quota-western-bg: #3d2416;
+  --quota-serpin: #b18ae0;
+  --quota-serpin-bg: #2e1f42;
   --combo: #7fcf9a;
   --combo-bg: #1c3226;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
@@ -443,14 +459,33 @@ table.stat-table th.th-rural { color: var(--quota-rural); }
 /* Акцент на проходной балл (порог допуска) в раскрытой строке вуза. */
 .detail-grid .detail-accent b { font-size: 1.5rem; color: var(--brand); }
 
-.grant-pool { margin-top: 12px; }
+/* Каждый пул квот (общий/пед/тех/западный/Серпін) — свой цвет, чтобы разделы
+   не сливались друг с другом: жирная цветная граница слева + название пула
+   тем же цветом. --pool-color задаётся через data-quota на самом .grant-pool
+   (см. RESULT_QUOTA_POOLS в app.js). */
+.grant-pool {
+  --pool-color: var(--quota-general);
+  --pool-color-bg: var(--quota-general-bg);
+  margin-top: 22px;
+  padding: 4px 0 4px 16px;
+  border-left: 4px solid var(--pool-color);
+}
+.grant-pool[data-quota="ped_quota"] { --pool-color: var(--quota-ped); --pool-color-bg: var(--quota-ped-bg); }
+.grant-pool[data-quota="tech_quota"] { --pool-color: var(--quota-tech); --pool-color-bg: var(--quota-tech-bg); }
+.grant-pool[data-quota="western_quota"] { --pool-color: var(--quota-western); --pool-color-bg: var(--quota-western-bg); }
+.grant-pool[data-quota="serpin"] { --pool-color: var(--quota-serpin); --pool-color-bg: var(--quota-serpin-bg); }
 .grant-pool-title {
-  font-size: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted);
-  margin: 0 0 8px;
+  color: var(--pool-color);
+  background: var(--pool-color-bg);
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin: 0 0 10px;
 }
 .grant-pool .path-card { background: var(--bg); }
 

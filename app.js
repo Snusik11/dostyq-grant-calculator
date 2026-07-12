@@ -784,13 +784,24 @@ function renderResults(container, { comboKey, score, rural, otherQuotas, orderQu
     const sp = specialties[code];
     if (!sp) continue;
 
-    const generalSrc = rows.filter((p) => p.gop_code === code);
-    const { visible: generalRows, totalCount } = buildFamilyRows(generalSrc, "general", "rural");
-
     // ped_quota — не чекбокс (Шаг 3), включена всегда для своего диапазона
     // специальностей (auto: true в ORDER_QUOTA_FAMILIES). tech/western/serpin
     // — только если отмечен чекбокс.
     const orderSrc = state.data.order_quota_paths.filter((p) => p.gop_code === code);
+
+    // Вуз, у которого на эту специальность есть выделенные места по
+    // пед-квоте, в общем конкурсе не показываем вовсе — только в разделе
+    // "Педагогическая квота" со своими местами. Решение продукта: даже если
+    // в PDF у такого вуза исторически были единичные победители через общий
+    // конкурс (реальные, другие люди — проверено по ИКТ), для пользователя
+    // это две параллельные истории одного вуза, что путает; пед-квота —
+    // основной и единственный путь, который показываем для таких вузов.
+    const pedQuotaUniCodes = new Set(
+      orderSrc.filter((p) => p.quota_id === "ped_quota").map((p) => p.university_code)
+    );
+    const generalSrc = rows.filter((p) => p.gop_code === code && !pedQuotaUniCodes.has(p.university_code));
+    const { visible: generalRows, totalCount } = buildFamilyRows(generalSrc, "general", "rural");
+
     const familyRowsByBase = {};
     for (const family of ORDER_QUOTA_FAMILIES) {
       if (!family.auto && !orderQuotas.includes(family.base)) {
@@ -942,11 +953,11 @@ function grantsTrendNote(countsByYear) {
 // вуза, см. buildFamilyRows выше). Так читаемее, чем сваливать все
 // применимые бейджи на одну строку.
 const RESULT_QUOTA_POOLS = [
-  { listKey: "generalRows", titleKey: "results.generalGrant", baseKey: "quota.general", ruralKey: "quota.rural" },
-  { listKey: "pedRows", titleKey: "quota.ped_quota", baseKey: "quota.ped_quota", ruralKey: "quota.ped_quotaRural" },
-  { listKey: "techRows", titleKey: "quota.tech_quota", baseKey: "quota.tech_quota", ruralKey: "quota.tech_quotaRural" },
-  { listKey: "westernRows", titleKey: "quota.western_quota", baseKey: "quota.western_quota", ruralKey: "quota.western_quotaRural" },
-  { listKey: "serpinRows", titleKey: "quota.serpin", baseKey: "quota.serpin", ruralKey: null },
+  { listKey: "generalRows", quotaKey: "general", titleKey: "results.generalGrant", baseKey: "quota.general", ruralKey: "quota.rural" },
+  { listKey: "pedRows", quotaKey: "ped_quota", titleKey: "quota.ped_quota", baseKey: "quota.ped_quota", ruralKey: "quota.ped_quotaRural" },
+  { listKey: "techRows", quotaKey: "tech_quota", titleKey: "quota.tech_quota", baseKey: "quota.tech_quota", ruralKey: "quota.tech_quotaRural" },
+  { listKey: "westernRows", quotaKey: "western_quota", titleKey: "quota.western_quota", baseKey: "quota.western_quota", ruralKey: "quota.western_quotaRural" },
+  { listKey: "serpinRows", quotaKey: "serpin", titleKey: "quota.serpin", baseKey: "quota.serpin", ruralKey: null },
 ];
 
 function renderSpecialtyResultCard(group) {
@@ -966,7 +977,7 @@ function renderSpecialtyResultCard(group) {
       <div class="specialty-result-body">
         <p class="hint">${t("results.availableUnis", { available: availableCount, total: totalCount })} · ${grantsTrendNote(countsByYear)} <a class="card-link" href="#/specialties/${encodeURIComponent(code)}">${t("btn.specCard")}</a></p>
         ${RESULT_QUOTA_POOLS.filter((pool) => group[pool.listKey].length).map((pool) => `
-          <div class="grant-pool">
+          <div class="grant-pool" data-quota="${pool.quotaKey}">
             <h3 class="grant-pool-title">${t(pool.titleKey)}</h3>
             ${group[pool.listKey].map((r) => renderQuotaUniRow(r, pool.baseKey, pool.ruralKey)).join("")}
           </div>
