@@ -5,7 +5,19 @@
 
 const DATA_FILES = [
   "specialties", "universities", "rural_quota_specialties",
-  "paths", "group_paths",
+  "paths", "order_quota_paths", "group_paths",
+];
+
+// Гос-заказы (специальность×вуз, как general/rural — НЕ группа специальностей,
+// как groupRows) — источник order_quota_paths.json. ped_quota — не чекбокс,
+// включается автоматически для своего диапазона специальностей (B001-B020),
+// у неё отдельные вузы, не участвующие в общем конкурсе на эти же места.
+// Остальные 3 — чекбоксы (см. renderCalculator, Шаг 3).
+const ORDER_QUOTA_FAMILIES = [
+  { base: "ped_quota", ruralVariant: "ped_rural", auto: true },
+  { base: "tech_quota", ruralVariant: "tech_rural", auto: false },
+  { base: "western_quota", ruralVariant: "western_rural", auto: false },
+  { base: "serpin", ruralVariant: null, auto: false },
 ];
 
 // ---------- Локализация (RU/KK) ----------
@@ -39,7 +51,7 @@ const I18N = {
     "results.count": "{n} из {total}",
     "results.emptyCombo": "По этой комбинации предметов специальностей не найдено.",
     "results.emptyFilter": "Нет результатов с таким сочетанием фильтров.",
-    "results.disclaimer": "Оценка — эвристика на основе тренда баллов реальных победителей 2023–2025 годов (edutest.kz — для педагогической квоты и части лет) и изменения числа грантов в 2026-2027 году. Не гарантия поступления.",
+    "results.disclaimer": "Оценка — эвристика на основе тренда баллов реальных победителей 2023–2025 годов и изменения числа грантов в 2026-2027 году. Не гарантия поступления.",
     "results.generalGrant": "Общий грант",
     "results.pedQuota": "Педагогическая квота",
     "results.thresholdFiltered": "Показаны только вузы, куда твой балл проходит по порогу допуска.",
@@ -65,6 +77,19 @@ const I18N = {
     "path.trendNote": "В 2026-2027 году {trend}.",
     "quota.general": "Общий конкурс",
     "quota.rural": "Сельская квота",
+    "quota.ped_quota": "Педагогическая квота",
+    "quota.ped_quotaRural": "Пед-квота (сельская)",
+    "quota.tech_quota": "Тех-квота",
+    "quota.tech_quotaRural": "Тех-квота (сельская)",
+    "quota.tech_quotaLabel": "Гос. заказ по техническим и сельхоз специальностям",
+    "quota.tech_quotaHint": "",
+    "quota.western_quota": "Западный регион",
+    "quota.western_quotaRural": "Западный регион (сельская)",
+    "quota.western_quotaLabel": "Я из западного региона (Атырауская, Мангистауская область)",
+    "quota.western_quotaHint": "Квота для абитуриентов из густонаселённых западных регионов — отмечай, только если действительно оттуда.",
+    "quota.serpin": "Серпін",
+    "quota.serpinLabel": "Я из сельской молодёжи, переселяющейся по программе «Серпін»",
+    "quota.serpinHint": "Квота для сельской молодёжи, переселяющейся в регионы, определённые Правительством РК — отмечай, только если подходишь под условия.",
     "confidence.high": "Высокий шанс",
     "confidence.medium": "Средний шанс",
     "confidence.low": "Низкий шанс",
@@ -158,7 +183,7 @@ const I18N = {
     "results.count": "{total} ішінен {n}",
     "results.emptyCombo": "Бұл пәндер комбинациясы бойынша мамандық табылмады.",
     "results.emptyFilter": "Осы сүзгі тіркесімі бойынша нәтиже жоқ.",
-    "results.disclaimer": "Бағалау — 2023–2025 жылдардағы нақты грант иегерлерінің балл трендіне (педагогикалық квота және кейбір жылдар үшін — edutest.kz) және 2026-2027 жылғы грант санының өзгеруіне негізделген эвристика. Түсуге кепілдік емес.",
+    "results.disclaimer": "Бағалау — 2023–2025 жылдардағы нақты грант иегерлерінің балл трендіне және 2026-2027 жылғы грант санының өзгеруіне негізделген эвристика. Түсуге кепілдік емес.",
     "results.generalGrant": "Жалпы грант",
     "results.pedQuota": "Педагогикалық квота",
     "results.thresholdFiltered": "Тек балың рұқсат шегінен өтетін ЖОО-лар көрсетілген.",
@@ -184,6 +209,19 @@ const I18N = {
     "path.trendNote": "2026-2027 жылы {trend}.",
     "quota.general": "Жалпы конкурс",
     "quota.rural": "Ауыл квотасы",
+    "quota.ped_quota": "Педагогикалық квота",
+    "quota.ped_quotaRural": "Пед-квота (ауыл)",
+    "quota.tech_quota": "Тех-квота",
+    "quota.tech_quotaRural": "Тех-квота (ауыл)",
+    "quota.tech_quotaLabel": "Техникалық және ауыл шаруашылығы мамандықтары бойынша мемлекеттік тапсырыс",
+    "quota.tech_quotaHint": "",
+    "quota.western_quota": "Батыс өңір",
+    "quota.western_quotaRural": "Батыс өңір (ауыл)",
+    "quota.western_quotaLabel": "Мен батыс өңірденмін (Атырау, Маңғыстау облысы)",
+    "quota.western_quotaHint": "Тығыз қоныстанған батыс өңірлерден келген талапкерлерге арналған квота — тек шынымен сол жақтан болсаң ғана белгіле.",
+    "quota.serpin": "Серпін",
+    "quota.serpinLabel": "Мен «Серпін» бағдарламасы бойынша көшіп келген ауыл жастарынанмын",
+    "quota.serpinHint": "Қазақстан Үкіметі айқындаған өңірлерге көшіп келген ауыл жастарына арналған квота — тек шарттарға сай болсаң ғана белгіле.",
     "confidence.high": "Жоғары мүмкіндік",
     "confidence.medium": "Орташа мүмкіндік",
     "confidence.low": "Төмен мүмкіндік",
@@ -638,6 +676,14 @@ function renderCalculator(app) {
           </div>
           <div class="hint" style="margin-bottom:10px">${t("calc.ruralHint")}</div>
           <div class="checkbox-grid">
+            ${ORDER_QUOTA_FAMILIES.filter((f) => !f.auto).map((f) => `
+              <div class="checkbox-item">
+                <input type="checkbox" class="order-quota" value="${f.base}" id="q-${f.base}" />
+                <label for="q-${f.base}">${t(`quota.${f.base}Label`)}</label>
+              </div>
+              ${t(`quota.${f.base}Hint`) ? `<div class="hint order-quota-hint">${t(`quota.${f.base}Hint`)}</div>` : ""}`).join("")}
+          </div>
+          <div class="checkbox-grid">
             ${Object.keys(GROUP_QUOTA_LABELS.ru).map((id) => `
               <div class="checkbox-item">
                 <input type="checkbox" class="other-quota" value="${id}" id="q-${id}" />
@@ -658,7 +704,8 @@ function renderCalculator(app) {
     const score = parseFloat(document.getElementById("score-input").value);
     const rural = document.getElementById("rural-checkbox").checked;
     const otherQuotas = [...document.querySelectorAll(".other-quota:checked")].map((el) => el.value);
-    state.calculatorInput = { comboKey, score, rural, otherQuotas };
+    const orderQuotas = [...document.querySelectorAll(".order-quota:checked")].map((el) => el.value);
+    state.calculatorInput = { comboKey, score, rural, otherQuotas, orderQuotas };
     renderResults(document.getElementById("results"), state.calculatorInput);
   });
 
@@ -666,7 +713,7 @@ function renderCalculator(app) {
   // вуза/специальности и назад, смена языка) — без этого calculatorInput
   // выше был бы бесполезен, форма просто оставалась бы пустой.
   if (state.calculatorInput) {
-    const { comboKey, score, rural, otherQuotas } = state.calculatorInput;
+    const { comboKey, score, rural, otherQuotas, orderQuotas } = state.calculatorInput;
     document.getElementById("combo-select").value = comboKey;
     document.getElementById("score-input").value = score;
     document.getElementById("rural-checkbox").checked = rural;
@@ -674,11 +721,15 @@ function renderCalculator(app) {
       const el = document.getElementById(`q-${id}`);
       if (el) el.checked = true;
     });
+    (orderQuotas || []).forEach((id) => {
+      const el = document.getElementById(`q-${id}`);
+      if (el) el.checked = true;
+    });
     renderResults(document.getElementById("results"), state.calculatorInput);
   }
 }
 
-function renderResults(container, { comboKey, score, rural, otherQuotas }) {
+function renderResults(container, { comboKey, score, rural, otherQuotas, orderQuotas = [] }) {
   const { specialties, paths, group_paths } = state.data;
   const gopCodes = new Set(specialtiesForCombo(specialties, comboKey));
 
@@ -690,73 +741,104 @@ function renderResults(container, { comboKey, score, rural, otherQuotas }) {
     ? group_paths.filter((g) => groupCodesInScope.has(g.group_code) && otherQuotas.includes(g.quota_id))
     : [];
 
-  const scored = rows.map((r) => ({ ...r, p: probabilityAt(r.probability_curve, score) }));
-
   // Вуз не показывается, если его проходной балл (порог допуска к конкурсу)
   // выше балла ученика — подать документы туда всё равно нельзя. Вузы без
   // известного порога остаются в списке.
   const passesThreshold = (threshold) => threshold == null || score >= threshold;
 
-  // Гранты выделяются на специальность, а не на вуз — сначала группируем
-  // по ГОП (общий грант и пед-квота — РАЗНЫЕ пулы, у пед-квоты вузы вообще
-  // не участвуют в общем конкурсе на эти же места), внутри уже вузы.
-  // Один вуз = одна строка: общий конкурс и сельская квота — два бейджа
-  // рядом, а не две отдельные карточки.
-  const specialtyGroups = [];
-  for (const code of gopCodes) {
-    const sp = specialties[code];
-    if (!sp) continue;
-
+  // Сводит строки одного семейства квот (base/rural) по university_code в
+  // один ряд (2 бейджа max — как общий+сельский). Общий конкурс и пед-квота
+  // (и тех/западная/Серпін) — РАЗНЫЕ пулы: у пед-квоты вузы часто вообще не
+  // участвуют в общем конкурсе на эти же места (B001: общий 9 вузов,
+  // пед-квота 18, пересечение всего 4) — но и наоборот, один и тот же вуз
+  // может реально набирать по ОБОИМ пулам одновременно (пед-квота —
+  // дополнительный гос-заказ поверх обычного, не замена). Поэтому квоты не
+  // сливаются в одну строку с кучей бейджей (нечитаемо), а остаются
+  // отдельными списками — как в жизни это отдельные конкурсы.
+  function buildFamilyRows(sourceRows, baseId, ruralId) {
     const byUni = new Map();
-    for (const r of scored.filter((x) => x.gop_code === code)) {
+    for (const r of sourceRows) {
+      if (r.quota_id !== baseId && r.quota_id !== ruralId) continue;
       const m = byUni.get(r.university_code) || {
         university_code: r.university_code,
         university_name: r.university_name,
         university_name_kk: r.university_name_kk,
         threshold_score: r.threshold_score,
-        general: null, rural: null, pGeneral: null, pRural: null,
+        base: null, rural: null, pBase: null, pRural: null,
       };
       m.threshold_score = m.threshold_score ?? r.threshold_score;
-      if (r.quota_id === "rural") { m.rural = r; m.pRural = r.p; }
-      else { m.general = r; m.pGeneral = r.p; }
+      const p = probabilityAt(r.probability_curve, score);
+      if (r.quota_id === ruralId) { m.rural = r; m.pRural = p; }
+      else { m.base = r; m.pBase = p; }
       byUni.set(r.university_code, m);
     }
-    const generalRows = [...byUni.values()]
+    const all = [...byUni.values()];
+    const visible = all
       .filter((m) => passesThreshold(m.threshold_score))
-      .sort((a, b) => Math.max(b.pGeneral ?? 0, b.pRural ?? 0) - Math.max(a.pGeneral ?? 0, a.pRural ?? 0));
+      .sort((a, b) => Math.max(b.pBase ?? 0, b.pRural ?? 0) - Math.max(a.pBase ?? 0, a.pRural ?? 0));
+    return { visible, totalCount: all.length };
+  }
 
-    const pedByUni = (sp.ped_quota && sp.ped_quota.by_university) || {};
-    const pedRows = Object.entries(pedByUni).map(([universityCode, u]) => ({
-      university_code: universityCode,
-      ...u,
-      pGeneral: u.probability_curve_general ? probabilityAt(u.probability_curve_general, score) : null,
-      pRural: rural && u.probability_curve_rural ? probabilityAt(u.probability_curve_rural, score) : null,
-    }))
-      .filter((r) => passesThreshold(r.threshold_score))
-      .sort((a, b) => Math.max(b.pGeneral ?? 0, b.pRural ?? 0) - Math.max(a.pGeneral ?? 0, a.pRural ?? 0));
+  const specialtyGroups = [];
+  for (const code of gopCodes) {
+    const sp = specialties[code];
+    if (!sp) continue;
 
-    if (generalRows.length === 0 && pedRows.length === 0) continue;
+    const generalSrc = rows.filter((p) => p.gop_code === code);
+    const { visible: generalRows, totalCount } = buildFamilyRows(generalSrc, "general", "rural");
+
+    // ped_quota — не чекбокс (Шаг 3), включена всегда для своего диапазона
+    // специальностей (auto: true в ORDER_QUOTA_FAMILIES). tech/western/serpin
+    // — только если отмечен чекбокс.
+    const orderSrc = state.data.order_quota_paths.filter((p) => p.gop_code === code);
+    const familyRowsByBase = {};
+    for (const family of ORDER_QUOTA_FAMILIES) {
+      if (!family.auto && !orderQuotas.includes(family.base)) {
+        familyRowsByBase[family.base] = [];
+        continue;
+      }
+      const ids = [family.base, ...(rural && family.ruralVariant ? [family.ruralVariant] : [])];
+      const { visible } = buildFamilyRows(orderSrc.filter((p) => ids.includes(p.quota_id)), family.base, family.ruralVariant);
+      familyRowsByBase[family.base] = visible;
+    }
+    const pedRows = familyRowsByBase.ped_quota;
+    const techRows = familyRowsByBase.tech_quota;
+    const westernRows = familyRowsByBase.western_quota;
+    const serpinRows = familyRowsByBase.serpin;
+
+    const allLists = [generalRows, pedRows, techRows, westernRows, serpinRows];
+    if (!allLists.some((l) => l.length)) continue;
 
     // Заголовочный процент специальности — НЕ отдельная предпосчитанная
     // кривая по всем вузам сразу (та, слитая в один пул, могла давать
     // 89% в заголовке при 32% у каждого реально видимого вуза — пул
     // тянет исторический минимум с любого, даже давно неактуального вуза).
     // Вместо этого — лучший результат СРЕДИ РЕАЛЬНО ВИДИМЫХ (прошедших
-    // порог допуска) вузов, ровно то же число, что видно при раскрытии.
-    const bestGeneral = generalRows.length ? Math.max(...generalRows.map((r) => r.pGeneral ?? 0)) : null;
+    // порог допуска) вузов общего конкурса, ровно то же число, что видно
+    // при раскрытии карточки в разделе "Общий грант".
+    const bestGeneral = generalRows.length ? Math.max(...generalRows.map((r) => r.pBase ?? 0)) : null;
     const bestRural = rural && generalRows.length ? Math.max(...generalRows.map((r) => r.pRural ?? 0)) : null;
+    // Лучший результат ПО ВСЕМ применимым квотам — сортировка списка
+    // специальностей должна учитывать, что реальный лучший шанс ученика
+    // может быть не в общем конкурсе, а, например, в пед-квоте. Бейдж в
+    // шапке при этом остаётся про общий конкурс (bestGeneral/bestRural) —
+    // конкретика по остальным квотам видна при раскрытии карточки.
+    const bestOfList = (list) => list.length ? Math.max(...list.map((r) => Math.max(r.pBase ?? 0, r.pRural ?? 0))) : 0;
+    const bestOverall = Math.max(...allLists.map(bestOfList)) || null;
     const availableCount = generalRows.length;
-    const totalCount = byUni.size;
 
     // Тренд числа грантов — свойство специальности (грант выделяется на неё),
     // показывается один раз в шапке, не в каждом вузе.
     const summaryYearly = (sp.general_grant_summary && sp.general_grant_summary.yearly) || [];
     const countsByYear = Object.fromEntries(summaryYearly.filter((y) => y.count != null).map((y) => [y.year, y.count]));
 
-    specialtyGroups.push({ code, sp, generalRows, pedRows, bestGeneral, bestRural, availableCount, totalCount, countsByYear });
+    specialtyGroups.push({
+      code, sp, generalRows, pedRows, techRows, westernRows, serpinRows,
+      bestGeneral, bestRural, bestOverall, availableCount, totalCount, countsByYear,
+    });
   }
   // Сортировка обязана совпадать с тем, что реально написано на бейдже.
-  specialtyGroups.sort((a, b) => Math.max(b.bestGeneral ?? 0, b.bestRural ?? 0) - Math.max(a.bestGeneral ?? 0, a.bestRural ?? 0));
+  specialtyGroups.sort((a, b) => (b.bestOverall ?? 0) - (a.bestOverall ?? 0));
 
   if (specialtyGroups.length === 0) {
     container.innerHTML = `<div class="empty-state">${t("results.emptyCombo")}</div>`;
@@ -779,11 +861,11 @@ function renderResults(container, { comboKey, score, rural, otherQuotas }) {
   const listEl = document.getElementById("result-list");
   const countEl = document.getElementById("result-count");
 
+  const ALL_ROW_LISTS = ["generalRows", "pedRows", "techRows", "westernRows", "serpinRows"];
   const universityOptions = [...new Map(
-    specialtyGroups.flatMap((g) => [
-      ...g.generalRows.map((r) => [r.university_code, { value: r.university_code, label: localizedName({ name: r.university_name, name_kk: r.university_name_kk }), showCode: true }]),
-      ...g.pedRows.map((r) => [r.university_code, { value: r.university_code, label: localizedName({ name: r.university_name, name_kk: r.university_name_kk }), showCode: true }]),
-    ])
+    specialtyGroups.flatMap((g) =>
+      ALL_ROW_LISTS.flatMap((key) => g[key]).map((r) => [r.university_code, { value: r.university_code, label: localizedName({ name: r.university_name, name_kk: r.university_name_kk }), showCode: true }])
+    )
   ).values()].sort((a, b) => a.label.localeCompare(b.label, "ru"));
 
   const specialtyOptions = specialtyGroups
@@ -793,14 +875,15 @@ function renderResults(container, { comboKey, score, rural, otherQuotas }) {
   const fs = filterState("results", { university: "", specialty: "" });
 
   function draw() {
+    const filterRows = (list) => fs.university ? list.filter((r) => r.university_code === fs.university) : list;
     const filtered = specialtyGroups
       .filter((g) => !fs.specialty || g.code === fs.specialty)
-      .map((g) => ({
-        ...g,
-        generalRows: fs.university ? g.generalRows.filter((r) => r.university_code === fs.university) : g.generalRows,
-        pedRows: fs.university ? g.pedRows.filter((r) => r.university_code === fs.university) : g.pedRows,
-      }))
-      .filter((g) => g.generalRows.length > 0 || g.pedRows.length > 0);
+      .map((g) => {
+        const next = { ...g };
+        for (const key of ALL_ROW_LISTS) next[key] = filterRows(g[key]);
+        return next;
+      })
+      .filter((g) => ALL_ROW_LISTS.some((key) => g[key].length > 0));
 
     countEl.textContent = t("results.count", { n: filtered.length, total: specialtyGroups.length });
     listEl.innerHTML = filtered.length
@@ -826,15 +909,20 @@ function renderResults(container, { comboKey, score, rural, otherQuotas }) {
 
 // Бейджи "Общий конкурс N%" + "Сельская квота M%" рядом — единый вид и для
 // строки вуза, и для заголовка специальности.
-function quotaBadges(pGeneral, pRural) {
+// baseKey/ruralKey — ключи i18n для подписи (по умолчанию общий/сельский);
+// та же функция используется и для пед/тех/западной квоты и Серпін —
+// каждая рисуется в СВОЁМ разделе (см. renderSpecialtyResultCard), поэтому
+// здесь всегда максимум 2 бейджа (база + её сельский вариант), а не свалка
+// из всех применимых квот на одной строке.
+function quotaBadges(pBase, pRural, baseKey = "quota.general", ruralKey = "quota.rural") {
   const badges = [];
-  if (pGeneral != null) {
-    const conf = confidenceLabel(pGeneral);
-    badges.push(`<span class="badge-quota general">${t("quota.general")}</span><span class="badge ${conf.cls}">${pct(pGeneral)} · ${conf.text}</span>`);
+  if (pBase != null) {
+    const conf = confidenceLabel(pBase);
+    badges.push(`<span class="badge-quota general">${t(baseKey)}</span><span class="badge ${conf.cls}">${pct(pBase)} · ${conf.text}</span>`);
   }
-  if (pRural != null) {
+  if (pRural != null && ruralKey) {
     const conf = confidenceLabel(pRural);
-    badges.push(`<span class="badge-quota rural">${t("quota.rural")}</span><span class="badge ${conf.cls}">${pct(pRural)} · ${conf.text}</span>`);
+    badges.push(`<span class="badge-quota rural">${t(ruralKey)}</span><span class="badge ${conf.cls}">${pct(pRural)} · ${conf.text}</span>`);
   }
   return badges.join("");
 }
@@ -848,8 +936,21 @@ function grantsTrendNote(countsByYear) {
   return t("path.trendNote", { trend });
 }
 
+// Каждая квота — свой раздел со своим списком вузов (даже если вуз
+// повторяется в нескольких разделах — общий конкурс и, например, пед-квота
+// зачастую РЕАЛЬНО разные конкурсы с разными баллами у одного и того же
+// вуза, см. buildFamilyRows выше). Так читаемее, чем сваливать все
+// применимые бейджи на одну строку.
+const RESULT_QUOTA_POOLS = [
+  { listKey: "generalRows", titleKey: "results.generalGrant", baseKey: "quota.general", ruralKey: "quota.rural" },
+  { listKey: "pedRows", titleKey: "quota.ped_quota", baseKey: "quota.ped_quota", ruralKey: "quota.ped_quotaRural" },
+  { listKey: "techRows", titleKey: "quota.tech_quota", baseKey: "quota.tech_quota", ruralKey: "quota.tech_quotaRural" },
+  { listKey: "westernRows", titleKey: "quota.western_quota", baseKey: "quota.western_quota", ruralKey: "quota.western_quotaRural" },
+  { listKey: "serpinRows", titleKey: "quota.serpin", baseKey: "quota.serpin", ruralKey: null },
+];
+
 function renderSpecialtyResultCard(group) {
-  const { code, sp, generalRows, pedRows, bestGeneral, bestRural, availableCount, totalCount, countsByYear } = group;
+  const { code, sp, bestGeneral, bestRural, availableCount, totalCount, countsByYear } = group;
   const spName = localizedName(sp) || code;
   const combos = genericSubjectCombos(sp);
 
@@ -864,18 +965,12 @@ function renderSpecialtyResultCard(group) {
       </summary>
       <div class="specialty-result-body">
         <p class="hint">${t("results.availableUnis", { available: availableCount, total: totalCount })} · ${grantsTrendNote(countsByYear)} <a class="card-link" href="#/specialties/${encodeURIComponent(code)}">${t("btn.specCard")}</a></p>
-        ${generalRows.length ? `
+        ${RESULT_QUOTA_POOLS.filter((pool) => group[pool.listKey].length).map((pool) => `
           <div class="grant-pool">
-            <h3 class="grant-pool-title">${t("results.generalGrant")}</h3>
-            ${generalRows.map((r) => renderMergedUniRow(r)).join("")}
+            <h3 class="grant-pool-title">${t(pool.titleKey)}</h3>
+            ${group[pool.listKey].map((r) => renderQuotaUniRow(r, pool.baseKey, pool.ruralKey)).join("")}
           </div>
-        ` : ""}
-        ${pedRows.length ? `
-          <div class="grant-pool">
-            <h3 class="grant-pool-title">${t("results.pedQuota")}</h3>
-            ${pedRows.map((r) => renderPedUniRow(r)).join("")}
-          </div>
-        ` : ""}
+        `).join("")}
       </div>
     </details>
   `;
@@ -897,14 +992,18 @@ function mergePathYearly(generalRow, ruralRow) {
   return [...byYear.values()].sort((a, b) => a.year - b.year);
 }
 
-function yearlyQuotaTable(rows) {
+// baseKey/ruralKey — подписи колонок (см. quotaBadges); ruralKey=null (у
+// Серпін нет сельского варианта — 0 вложенных 'СЕЛЬСКАЯ КВОТА' в PDF) прячет
+// колонку целиком, а не показывает вечно пустую.
+function yearlyQuotaTable(rows, baseKey = "quota.general", ruralKey = "quota.rural") {
   if (!rows.length) return `<p class="hint">${t("cutoffTable.noData")}</p>`;
+  const showRural = !!ruralKey;
   return `
     <div class="table-scroll">
     <table class="stat-table yearly-table">
-      <thead><tr><th>${t("path.year")}</th><th class="th-general">${t("quota.general")}</th><th class="th-rural">${t("quota.rural")}</th><th>${t("path.winnersCol")}</th></tr></thead>
+      <thead><tr><th>${t("path.year")}</th><th class="th-general">${t(baseKey)}</th>${showRural ? `<th class="th-rural">${t(ruralKey)}</th>` : ""}<th>${t("path.winnersCol")}</th></tr></thead>
       <tbody>
-        ${rows.map((y) => `<tr><td>${y.year}</td><td class="stat-general">${y.general ? `${y.general.min}–${y.general.max}` : "—"}</td><td class="stat-rural">${y.rural ? `${y.rural.min}–${y.rural.max}` : "—"}</td><td>${y.count ?? "—"}</td></tr>`).join("")}
+        ${rows.map((y) => `<tr><td>${y.year}</td><td class="stat-general">${y.general ? `${y.general.min}–${y.general.max}` : "—"}</td>${showRural ? `<td class="stat-rural">${y.rural ? `${y.rural.min}–${y.rural.max}` : "—"}</td>` : ""}<td>${y.count ?? "—"}</td></tr>`).join("")}
       </tbody>
     </table>
     </div>
@@ -913,24 +1012,27 @@ function yearlyQuotaTable(rows) {
 
 // Раскрываемая строка вуза: акцент — на проходной балл (порог допуска)
 // текущего цикла; исторический минимум победителя — второстепенная справка.
-function uniRowDetails({ threshold, lastYearMin, lastYear, yearlyRows, uniCode }) {
+function uniRowDetails({ threshold, lastYearMin, lastYear, yearlyRows, uniCode, baseKey, ruralKey }) {
   return `
     <div class="path-details">
       <div class="detail-grid">
         <div class="detail-accent"><b>${threshold ?? "—"}</b><span>${t("path.thresholdLabel")}</span></div>
         ${lastYearMin != null ? `<div><b>${lastYearMin}</b><span>${t("path.lastYearMin", { year: lastYear })}</span></div>` : ""}
       </div>
-      ${yearlyQuotaTable(yearlyRows)}
+      ${yearlyQuotaTable(yearlyRows, baseKey, ruralKey)}
       <p><a class="card-link" href="#/universities/${uniCode}">${t("btn.uniCard")}</a></p>
     </div>
   `;
 }
 
-function renderMergedUniRow(m) {
+// Универсальная строка вуза внутри раздела квоты (общий/пед/тех/западная/
+// Серпін — каждый раздел рисует свой список этой же функцией с своими
+// baseKey/ruralKey, см. RESULT_QUOTA_POOLS).
+function renderQuotaUniRow(m, baseKey, ruralKey) {
   const uniName = localizedName({ name: m.university_name, name_kk: m.university_name_kk });
-  const base = m.general || m.rural;
-  const lastYear = base.data_years ? base.data_years[base.data_years.length - 1] : 2025;
-  const lowSample = (m.general?.low_sample ?? true) && (m.rural?.low_sample ?? true);
+  const base = m.base || m.rural;
+  const lastYear = base?.data_years ? base.data_years[base.data_years.length - 1] : 2025;
+  const lowSample = (m.base?.low_sample ?? true) && (m.rural?.low_sample ?? true);
 
   return `
     <details class="path-card">
@@ -939,39 +1041,15 @@ function renderMergedUniRow(m) {
           <div class="path-uni">${codeBadge(m.university_code)} ${escapeHtml(uniName)}</div>
           <div class="path-sub">${lowSample ? `<span class="badge-note">${t("path.lowSample")}</span>` : ""}</div>
         </div>
-        <div class="path-badges">${quotaBadges(m.pGeneral, m.pRural)}</div>
+        <div class="path-badges">${quotaBadges(m.pBase, m.pRural, baseKey, ruralKey)}</div>
       </summary>
       ${uniRowDetails({
         threshold: m.threshold_score,
-        lastYearMin: m.general?.cutoff_2025 ?? m.rural?.cutoff_2025,
+        lastYearMin: m.base?.cutoff_2025 ?? m.rural?.cutoff_2025,
         lastYear,
-        yearlyRows: mergePathYearly(m.general, m.rural),
+        yearlyRows: mergePathYearly(m.base, m.rural),
         uniCode: m.university_code,
-      })}
-    </details>
-  `;
-}
-
-function renderPedUniRow(r) {
-  const uniName = localizedName({ name: r.university_name, name_kk: r.university_name_kk });
-  const yearsRows = (r.yearly || []).filter((y) => y.general || y.rural || y.count != null);
-  const scoreYears = yearsRows.filter((y) => y.general || y.rural);
-  const lastScoreYear = scoreYears.length ? scoreYears[scoreYears.length - 1] : null;
-
-  return `
-    <details class="path-card">
-      <summary>
-        <div class="path-main">
-          <div class="path-uni">${codeBadge(r.university_code)} ${escapeHtml(uniName)}</div>
-        </div>
-        <div class="path-badges">${quotaBadges(r.pGeneral, r.pRural)}</div>
-      </summary>
-      ${uniRowDetails({
-        threshold: r.threshold_score,
-        lastYearMin: lastScoreYear?.general?.min ?? lastScoreYear?.rural?.min,
-        lastYear: lastScoreYear?.year,
-        yearlyRows: yearsRows,
-        uniCode: r.university_code,
+        baseKey, ruralKey,
       })}
     </details>
   `;
@@ -1110,6 +1188,35 @@ function ynCell(flag) {
     : `<span class="yn no">${ICON_CROSS}${t("universityDetail.no")}</span>`;
 }
 
+// Пед/тех/западная квота и Серпін хранятся в order_quota_paths.json —
+// плоско, по (quota_id, gop_code, university_code), как general/rural в
+// paths.json, а не вложенным словарём по вузу (старый формат eduser/edutest).
+// Группирует по вузу и сводит base+rural пару через уже существующий
+// mergePathYearly (та же логика, что общий конкурс + сельская квота).
+function orderQuotaByUniversity(code, baseId, ruralId) {
+  const { order_quota_paths } = state.data;
+  const baseRows = order_quota_paths.filter((p) => p.gop_code === code && p.quota_id === baseId);
+  const ruralRows = ruralId
+    ? order_quota_paths.filter((p) => p.gop_code === code && p.quota_id === ruralId)
+    : [];
+  const byUni = new Map();
+  for (const r of baseRows) byUni.set(r.university_code, { base: r, rural: null });
+  for (const r of ruralRows) {
+    const e = byUni.get(r.university_code) || { base: null, rural: null };
+    e.rural = r;
+    byUni.set(r.university_code, e);
+  }
+  return [...byUni.entries()].map(([uniCode, { base, rural }]) => {
+    const src = base || rural;
+    return [uniCode, {
+      university_name: src.university_name,
+      university_name_kk: src.university_name_kk,
+      threshold_score: src.threshold_score,
+      yearly: mergePathYearly(base, rural),
+    }];
+  });
+}
+
 function renderSpecialtyDetail(app, code) {
   const { specialties, paths, universities } = state.data;
   const sp = specialties[code];
@@ -1121,7 +1228,7 @@ function renderSpecialtyDetail(app, code) {
   const rural = paths.filter((p) => p.gop_code === code && p.quota_id === "rural");
 
   const summaryYearly = (sp.general_grant_summary && sp.general_grant_summary.yearly) || [];
-  const pedEntries = Object.entries((sp.ped_quota && sp.ped_quota.by_university) || {});
+  const pedEntries = orderQuotaByUniversity(code, "ped_quota", "ped_rural");
 
   // Вкладка 1: мин/макс баллы — мин и макс отдельными колонками; общий
   // грант агрегатом (один пул), пед-квота по каждому вузу с годами.
