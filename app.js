@@ -5,7 +5,7 @@
 
 const DATA_FILES = [
   "specialties", "universities", "rural_quota_specialties",
-  "paths", "order_quota_paths", "group_paths",
+  "paths", "order_quota_paths", "group_paths", "ent_distribution",
 ];
 
 // Гос-заказы (специальность×вуз, как general/rural — НЕ группа специальностей,
@@ -31,7 +31,6 @@ const I18N = {
     "nav.calculator": "Калькулятор",
     "nav.specialties": "Специальности",
     "nav.universities": "Вузы",
-    "footer.disclaimer": "Данные: официальный список обладателей грантов 2023–2025 годов, приказы о распределении грантов 2024–2027, testcenter.kz, eduser.app. Оценки — эвристика на основе тренда прошлых лет, не гарантия поступления.",
     "calc.title": "Калькулятор шансов на грант",
     "calc.lede": "Оценка построена на реальных данных победителей 2023–2025 годов (тренд балла по годам) и актуальном количестве грантов на 2026-2027 учебный год. Это эвристика, а не гарантия — используй как ориентир, а не точный прогноз.",
     "calc.step1": "Профильные предметы ЕНТ",
@@ -52,6 +51,17 @@ const I18N = {
     "results.emptyCombo": "По этой комбинации предметов специальностей не найдено.",
     "results.emptyFilter": "Нет результатов с таким сочетанием фильтров.",
     "results.disclaimer": "Оценка — эвристика на основе тренда баллов реальных победителей 2023–2025 годов и изменения числа грантов в 2026-2027 году. Не гарантия поступления.",
+    "cp.title": "Конкуренция по твоей комбинации",
+    "cp.yourScore": "твой балл {score}",
+    "cp.competitorsLabel": "Конкурентов (твой балл и выше)",
+    "cp.in2026": "в 2026",
+    "cp.vs2025": "было {n} в 2025",
+    "cp.verdictUp": "конкуренция выросла",
+    "cp.verdictDown": "конкуренция снизилась",
+    "cp.verdictFlat": "без изменений",
+    "cp.percentileLabel": "Твой перцентиль (2026)",
+    "cp.percentileSub": "выше стольких сдававших твою комбинацию",
+    "cp.hint": "Распределение всех сдававших ЕНТ по твоей комбинации предметов (данные ҰТО, 2026). Столбик с твоим баллом выделен.",
     "results.generalGrant": "Общий грант",
     "results.pedQuota": "Педагогическая квота",
     "results.thresholdFiltered": "Показаны только вузы, куда твой балл проходит по порогу допуска.",
@@ -163,7 +173,6 @@ const I18N = {
     "nav.calculator": "Калькулятор",
     "nav.specialties": "Мамандықтар",
     "nav.universities": "ЖОО-лар",
-    "footer.disclaimer": "Деректер: 2023–2025 жылдардағы білім гранттарын иеленушілердің ресми тізімі, 2024–2027 жылдардағы гранттарды бөлу туралы бұйрықтар, testcenter.kz, eduser.app. Бағалау — өткен жылдардың трендіне негізделген эвристика, түсуге кепілдік емес.",
     "calc.title": "Грантқа түсу мүмкіндігін есептеу",
     "calc.lede": "Бағалау 2023–2025 жылдардағы грант иегерлерінің нақты деректеріне (жылдар бойынша балл трендіне) және 2026-2027 оқу жылына бөлінген грант санына негізделген. Бұл — эвристика, кепілдік емес, бағдар ретінде ғана пайдалан.",
     "calc.step1": "ҰБТ бойынша профильді пәндер",
@@ -184,6 +193,17 @@ const I18N = {
     "results.emptyCombo": "Бұл пәндер комбинациясы бойынша мамандық табылмады.",
     "results.emptyFilter": "Осы сүзгі тіркесімі бойынша нәтиже жоқ.",
     "results.disclaimer": "Бағалау — 2023–2025 жылдардағы нақты грант иегерлерінің балл трендіне және 2026-2027 жылғы грант санының өзгеруіне негізделген эвристика. Түсуге кепілдік емес.",
+    "cp.title": "Сенің комбинацияң бойынша бәсеке",
+    "cp.yourScore": "сенің балың {score}",
+    "cp.competitorsLabel": "Бәсекелестер (сенің балың және жоғары)",
+    "cp.in2026": "2026 жылы",
+    "cp.vs2025": "2025 жылы {n} болған",
+    "cp.verdictUp": "бәсеке артты",
+    "cp.verdictDown": "бәсеке азайды",
+    "cp.verdictFlat": "өзгеріссіз",
+    "cp.percentileLabel": "Сенің перцентилің (2026)",
+    "cp.percentileSub": "комбинацияңды тапсырғандардың осынша пайызынан жоғары",
+    "cp.hint": "Сенің пән комбинацияң бойынша ҰБТ тапсырғандардың балл бойынша таралуы (ҰТО деректері, 2026). Сенің балың бар баған ерекшеленген.",
     "results.generalGrant": "Жалпы грант",
     "results.pedQuota": "Педагогикалық квота",
     "results.thresholdFiltered": "Тек балың рұқсат шегінен өтетін ЖОО-лар көрсетілген.",
@@ -858,6 +878,7 @@ function renderResults(container, { comboKey, score, rural, otherQuotas, orderQu
 
   container.innerHTML = `
     <h2>${t("results.title")}</h2>
+    ${renderCompetitionPanel(comboKey, score)}
     <div class="result-controls">
       <div id="university-filter-mount"></div>
       <div id="specialty-filter-mount"></div>
@@ -916,6 +937,78 @@ function renderResults(container, { comboKey, score, rural, otherQuotas, orderQu
   });
 
   draw();
+}
+
+// Панель "Конкуренция по твоей комбинации" — распределение ВСЕХ сдававших ЕНТ
+// по баллам (не победителей грантов) на комбинацию профильных предметов
+// ученика. Рисуется ДО списка вузов. Источник — ent_distribution.json (офиц.
+// статистика ҰТО, 2025 + 2026). Творческие комбинации (другие бины) данных не
+// имеют — тогда панель не показываем.
+function renderCompetitionPanel(comboKey, score) {
+  const dist = state.data.ent_distribution;
+  if (!dist || !dist.combos) return "";
+  const combo = dist.combos[comboKey];
+  if (!combo || !combo["2025"] || !combo["2026"]) return "";
+  const b2025 = combo["2025"], b2026 = combo["2026"];
+  const { bin_labels, bin_lo, bin_hi } = dist;
+
+  // Бин ученика: куда попадает его балл. Ниже нижней границы — самый левый бин.
+  let bin = bin_lo.findIndex((lo, i) => score >= lo && score <= bin_hi[i]);
+  if (bin < 0) bin = score < bin_lo[0] ? 0 : bin_labels.length - 1;
+
+  const sumFrom = (arr, i) => arr.slice(i).reduce((s, v) => s + v, 0);
+  const sumBelow = (arr, i) => arr.slice(0, i).reduce((s, v) => s + v, 0);
+  // Конкуренты = бин ученика + все бины выше (его балл и лучше).
+  const comp2026 = sumFrom(b2026, bin);
+  const comp2025 = sumFrom(b2025, bin);
+  const delta = comp2026 - comp2025;
+  const pctChange = comp2025 ? Math.round((delta / comp2025) * 100) : null;
+  const dir = delta > 0 ? "up" : (delta < 0 ? "down" : "flat");
+
+  // Перцентиль: доля сдававших со СТРОГО меньшим баллом (бины ниже) в 2026.
+  const total2026 = b2026.reduce((s, v) => s + v, 0);
+  const percentile = total2026 ? Math.round((sumBelow(b2026, bin) / total2026) * 100) : 0;
+
+  // Мини-гистограмма 2026 с подсветкой бина ученика.
+  const maxBar = Math.max(...b2026, 1);
+  const bars = b2026.map((v, i) => {
+    const h = Math.max(2, Math.round((v / maxBar) * 100));
+    const cls = i === bin ? "cp-bar cp-bar-you" : "cp-bar";
+    return `<div class="cp-bar-wrap" title="${bin_labels[i]}: ${v.toLocaleString("ru")}">
+      <div class="cp-bar-val">${v.toLocaleString("ru")}</div>
+      <div class="cp-bar-track"><div class="${cls}" style="height:${h}%"></div></div>
+      <div class="cp-bar-label">${bin_labels[i]}</div>
+    </div>`;
+  }).join("");
+
+  const comboMeta = buildSubjectCombos(state.data.specialties).find((c) => c.key === comboKey);
+  const comboLabel = comboMeta ? formatSubjectCombo({ subject_1: comboMeta.a, subject_2: comboMeta.b }) : "";
+  const verdictKey = dir === "up" ? "cp.verdictUp" : (dir === "down" ? "cp.verdictDown" : "cp.verdictFlat");
+  const arrow = dir === "up" ? "↑" : (dir === "down" ? "↓" : "→");
+  const deltaStr = `${arrow} ${Math.abs(delta).toLocaleString("ru")}${pctChange != null ? ` (${pctChange > 0 ? "+" : ""}${pctChange}%)` : ""}`;
+
+  return `
+    <div class="competition-panel">
+      <div class="cp-head">
+        <div class="cp-title">${t("cp.title")}</div>
+        <div class="cp-combo">${escapeHtml(comboLabel)} · ${t("cp.yourScore", { score })} · ${bin_labels[bin]}</div>
+      </div>
+      <div class="cp-metrics">
+        <div class="cp-metric">
+          <div class="cp-metric-label">${t("cp.competitorsLabel")}</div>
+          <div class="cp-metric-main">${comp2026.toLocaleString("ru")}<span class="cp-metric-year">${t("cp.in2026")}</span></div>
+          <div class="cp-metric-sub">${t("cp.vs2025", { n: comp2025.toLocaleString("ru") })}</div>
+          <div class="cp-delta cp-delta-${dir}">${deltaStr} — ${t(verdictKey)}</div>
+        </div>
+        <div class="cp-metric">
+          <div class="cp-metric-label">${t("cp.percentileLabel")}</div>
+          <div class="cp-metric-main">${percentile}%</div>
+          <div class="cp-metric-sub">${t("cp.percentileSub")}</div>
+        </div>
+      </div>
+      <div class="cp-histogram">${bars}</div>
+      <div class="cp-hint">${t("cp.hint")}</div>
+    </div>`;
 }
 
 // Бейджи "Общий конкурс N%" + "Сельская квота M%" рядом — единый вид и для
