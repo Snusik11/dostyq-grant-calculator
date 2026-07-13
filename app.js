@@ -62,6 +62,16 @@ const I18N = {
     "cp.percentileLabel": "Твой перцентиль (2026)",
     "cp.percentileSub": "выше стольких сдававших твою комбинацию",
     "cp.hint": "Распределение всех сдававших ЕНТ по твоей комбинации предметов (данные ҰТО, 2026). Столбик с твоим баллом выделен.",
+    "app.title": "Моя заявка",
+    "app.empty": "Добавляй специальности из списка ниже кнопкой «+» — до 4 приоритетов, как в реальной заявке.",
+    "app.priorityHint": "Порядок = твой приоритет. Меняй стрелками ↑ ↓, удаляй крестиком.",
+    "app.add": "Добавить в заявку",
+    "app.remove": "Убрать из заявки",
+    "app.dupSpecialty": "Эта специальность уже в заявке (одну специальность можно добавить только раз)",
+    "app.full": "В заявке максимум 4 специальности",
+    "app.clear": "Очистить заявку",
+    "app.moveUp": "Выше",
+    "app.moveDown": "Ниже",
     "results.generalGrant": "Общий грант",
     "results.pedQuota": "Педагогическая квота",
     "results.thresholdFiltered": "Показаны только вузы, куда твой балл проходит по порогу допуска.",
@@ -129,6 +139,7 @@ const I18N = {
     "specialtyDetail.backLink": "← Все специальности",
     "specialtyDetail.notFound": "Специальность не найдена.",
     "specialtyDetail.minMax": "Мин/макс баллы",
+    "specialtyDetail.byUniLabel": "По вузам — нажми на вуз, чтобы раскрыть историю по годам",
     "specialtyDetail.grantCounts": "Количество грантов",
     "specialtyDetail.universitiesSection": "Вузы",
     "specialtyDetail.allUniversities": "Все вузы",
@@ -204,6 +215,16 @@ const I18N = {
     "cp.percentileLabel": "Сенің перцентилің (2026)",
     "cp.percentileSub": "комбинацияңды тапсырғандардың осынша пайызынан жоғары",
     "cp.hint": "Сенің пән комбинацияң бойынша ҰБТ тапсырғандардың балл бойынша таралуы (ҰТО деректері, 2026). Сенің балың бар баған ерекшеленген.",
+    "app.title": "Менің өтінімім",
+    "app.empty": "Төмендегі тізімнен «+» батырмасымен мамандық қос — нақты өтініштегідей 4 басымдыққа дейін.",
+    "app.priorityHint": "Реті = сенің басымдығың. ↑ ↓ көрсеткілерімен ауыстыр, крестикпен өшір.",
+    "app.add": "Өтінімге қосу",
+    "app.remove": "Өтінімнен алып тастау",
+    "app.dupSpecialty": "Бұл мамандық өтінімде бар (бір мамандықты бір рет қана қосуға болады)",
+    "app.full": "Өтінімде ең көбі 4 мамандық",
+    "app.clear": "Өтінімді тазарту",
+    "app.moveUp": "Жоғары",
+    "app.moveDown": "Төмен",
     "results.generalGrant": "Жалпы грант",
     "results.pedQuota": "Педагогикалық квота",
     "results.thresholdFiltered": "Тек балың рұқсат шегінен өтетін ЖОО-лар көрсетілген.",
@@ -271,6 +292,7 @@ const I18N = {
     "specialtyDetail.backLink": "← Барлық мамандықтар",
     "specialtyDetail.notFound": "Мамандық табылмады.",
     "specialtyDetail.minMax": "Мин/макс баллдар",
+    "specialtyDetail.byUniLabel": "ЖОО-лар бойынша — жылдар тарихын ашу үшін ЖОО-ны бас",
     "specialtyDetail.grantCounts": "Грант саны",
     "specialtyDetail.universitiesSection": "ЖОО-лар",
     "specialtyDetail.allUniversities": "Барлық ЖОО-лар",
@@ -457,7 +479,65 @@ function localizedSubjectCombo(entity) {
 // filters — то же самое для дропдаунов-фильтров на страницах списков/карточек
 // (по key страницы, у деталей специальности/вуза — с кодом в key, чтобы
 // фильтры одной специальности не подмешивались к другой).
-const state = { data: null, calculatorInput: null, filters: {} };
+const state = { data: null, calculatorInput: null, filters: {}, application: [], applicationCombo: null };
+
+// ---------- "Моя заявка" (список приоритетов, как реальная заявка на грант) ----------
+// До 4 специальностей (реальная заявка в РК — до 4 приоритетов). Уникальность
+// по СПЕЦИАЛЬНОСТИ: одна специальность (gop_code) может быть в списке только раз,
+// даже с разными вузами. Переживает перезагрузку через localStorage.
+const APP_MAX = 4;
+const APP_STORAGE_KEY = "dostyq_application";
+
+// Заявка привязана к комбинации предметов (combo): у каждой комбинации свои
+// специальности, поэтому при смене комбинации заявка обнуляется (иначе в ней
+// остались бы специальности, недоступные для новой комбинации).
+function loadApplication() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(APP_STORAGE_KEY));
+    if (raw && Array.isArray(raw.items)) return { combo: raw.combo || null, items: raw.items.slice(0, APP_MAX) };
+  } catch { /* повреждённое хранилище — начинаем с пустого */ }
+  return { combo: null, items: [] };
+}
+function saveApplication() {
+  try {
+    localStorage.setItem(APP_STORAGE_KEY, JSON.stringify({ combo: state.applicationCombo, items: state.application }));
+  } catch { /* приватный режим — не критично */ }
+}
+// Сбрасывает заявку, если комбинация сменилась (вызывается из renderResults).
+function reconcileApplicationCombo(comboKey) {
+  if (state.applicationCombo === comboKey) return;
+  state.applicationCombo = comboKey;
+  state.application = [];
+  saveApplication();
+}
+function appHasSpecialty(code) { return state.application.some((it) => it.code === code); }
+function appIndexOf(code, uni, quota) {
+  return state.application.findIndex((it) => it.code === code && it.university_code === uni && it.quota === quota);
+}
+// Возвращает причину блокировки добавления ("dup"/"full") или null, если можно.
+function appAddBlockReason(code) {
+  if (appHasSpecialty(code)) return "dup";
+  if (state.application.length >= APP_MAX) return "full";
+  return null;
+}
+function addToApplication(item) {
+  if (appAddBlockReason(item.code)) return false;
+  state.application.push(item);
+  saveApplication();
+  return true;
+}
+function removeFromApplication(idx) {
+  if (idx < 0 || idx >= state.application.length) return;
+  state.application.splice(idx, 1);
+  saveApplication();
+}
+function moveApplication(idx, dir) {
+  const j = idx + dir;
+  if (idx < 0 || j < 0 || idx >= state.application.length || j >= state.application.length) return;
+  [state.application[idx], state.application[j]] = [state.application[j], state.application[idx]];
+  saveApplication();
+}
+function clearApplication() { state.application = []; saveApplication(); }
 
 // Возвращает персистентный объект фильтров для страницы (создаёт при первом
 // обращении) — тот же объект переживает re-render, а не пересоздаётся с нуля.
@@ -751,6 +831,8 @@ function renderCalculator(app) {
 
 function renderResults(container, { comboKey, score, rural, otherQuotas, orderQuotas = [] }) {
   const { specialties, paths, group_paths } = state.data;
+  // Сменилась комбинация — заявка обнуляется (в ней были бы чужие специальности).
+  reconcileApplicationCombo(comboKey);
   const gopCodes = new Set(specialtiesForCombo(specialties, comboKey));
 
   const quotaIds = ["general", ...(rural ? ["rural"] : [])];
@@ -872,13 +954,24 @@ function renderResults(container, { comboKey, score, rural, otherQuotas, orderQu
   specialtyGroups.sort((a, b) => (b.bestOverall ?? 0) - (a.bestOverall ?? 0));
 
   if (specialtyGroups.length === 0) {
-    container.innerHTML = `<div class="empty-state">${t("results.emptyCombo")}</div>`;
+    // Ни один вуз не проходит по порогу — но панель конкуренции и уже
+    // собранная заявка должны остаться видны (заявка не теряется).
+    container.innerHTML = `
+      <h2>${t("results.title")}</h2>
+      ${renderCompetitionPanel(comboKey, score)}
+      <div id="application-panel"></div>
+      <div class="empty-state">${t("results.emptyCombo")}</div>
+    `;
+    resultsClickCtx = { draw: () => {}, drawApplicationPanel: () => drawApplicationPanelInto(score, rural), buildAppItem: () => null };
+    bindResultsClicks(container);
+    drawApplicationPanelInto(score, rural);
     return;
   }
 
   container.innerHTML = `
     <h2>${t("results.title")}</h2>
     ${renderCompetitionPanel(comboKey, score)}
+    <div id="application-panel"></div>
     <div class="result-controls">
       <div id="university-filter-mount"></div>
       <div id="specialty-filter-mount"></div>
@@ -894,6 +987,32 @@ function renderResults(container, { comboKey, score, rural, otherQuotas, orderQu
   const countEl = document.getElementById("result-count");
 
   const ALL_ROW_LISTS = ["generalRows", "pedRows", "techRows", "westernRows", "serpinRows"];
+
+  // Индекс строк текущей выдачи для "Моей заявки": ключ quota|code|uni →
+  // {строка, пул, имя специальности}. Нужен и для сборки пункта при клике "+",
+  // и для живого пересчёта % в панели при смене балла.
+  const rowIndex = new Map();
+  for (const g of specialtyGroups) {
+    for (const pool of RESULT_QUOTA_POOLS) {
+      for (const m of g[pool.listKey]) {
+        rowIndex.set(`${pool.quotaKey}|${g.code}|${m.university_code}`, { m, pool, spName: localizedName(g.sp) || g.code });
+      }
+    }
+  }
+  function buildAppItem(code, uni, quota) {
+    const hit = rowIndex.get(`${quota}|${code}|${uni}`);
+    if (!hit) return null;
+    const { m, pool, spName } = hit;
+    return {
+      code, university_code: uni, quota, spName,
+      university_name: m.university_name, university_name_kk: m.university_name_kk,
+      pBase: m.pBase, pRural: m.pRural,
+      baseKey: pool.baseKey, ruralKey: pool.ruralKey, quotaTitleKey: pool.titleKey,
+    };
+  }
+  const drawApplicationPanel = () => drawApplicationPanelInto(score, rural);
+  resultsClickCtx = { draw, drawApplicationPanel, buildAppItem };
+  bindResultsClicks(container);
   const universityOptions = [...new Map(
     specialtyGroups.flatMap((g) =>
       ALL_ROW_LISTS.flatMap((key) => g[key]).map((r) => [r.university_code, { value: r.university_code, label: localizedName({ name: r.university_name, name_kk: r.university_name_kk }), showCode: true }])
@@ -937,6 +1056,7 @@ function renderResults(container, { comboKey, score, rural, otherQuotas, orderQu
   });
 
   draw();
+  drawApplicationPanel();
 }
 
 // Панель "Конкуренция по твоей комбинации" — распределение ВСЕХ сдававших ЕНТ
@@ -1072,7 +1192,7 @@ function renderSpecialtyResultCard(group) {
         ${RESULT_QUOTA_POOLS.filter((pool) => group[pool.listKey].length).map((pool) => `
           <div class="grant-pool" data-quota="${pool.quotaKey}">
             <h3 class="grant-pool-title">${t(pool.titleKey)}</h3>
-            ${group[pool.listKey].map((r) => renderQuotaUniRow(r, pool.baseKey, pool.ruralKey)).join("")}
+            ${group[pool.listKey].map((r) => renderQuotaUniRow(r, pool.baseKey, pool.ruralKey, code, pool.quotaKey)).join("")}
           </div>
         `).join("")}
       </div>
@@ -1131,10 +1251,115 @@ function uniRowDetails({ threshold, lastYearMin, lastYear, yearlyRows, uniCode, 
   `;
 }
 
+// Кнопка "+" на строке вуза: добавить пару специальность×вуз в "Мою заявку".
+// Уже в заявке (эта строка) → "✓" (клик убирает). Специальность уже занята
+// другим вузом или заявка полна → заблокирована с тултипом-объяснением.
+function appAddButton(code, uni, quota) {
+  const added = appIndexOf(code, uni, quota) >= 0;
+  const block = added ? null : appAddBlockReason(code);
+  const disabled = !added && !!block;
+  const title = added ? t("app.remove")
+    : block === "dup" ? t("app.dupSpecialty")
+    : block === "full" ? t("app.full")
+    : t("app.add");
+  const cls = `app-add-btn${added ? " added" : ""}${disabled ? " blocked" : ""}`;
+  return `<button type="button" class="${cls}" data-app-add data-code="${escapeHtml(code)}" data-uni="${escapeHtml(uni)}" data-quota="${escapeHtml(quota || "")}" ${disabled ? "disabled" : ""} title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${added ? "✓" : "+"}</button>`;
+}
+
+// Панель "Моя заявка" (чистый рендер по массиву items; состояние в
+// state.application, живой пересчёт % — в drawApplicationPanel внутри
+// renderResults). Порядок пунктов = приоритет.
+function renderApplicationPanel(items) {
+  const head = `<div class="app-head"><span class="app-title">${t("app.title")}</span><span class="app-count">${items.length}/${APP_MAX}</span></div>`;
+  if (!items.length) {
+    return `<div class="application-panel is-empty">${head}<div class="app-empty">${t("app.empty")}</div></div>`;
+  }
+  const rows = items.map((it, i) => {
+    const uniName = localizedName({ name: it.university_name, name_kk: it.university_name_kk });
+    const quotaLabel = it.quotaTitleKey ? t(it.quotaTitleKey) : "";
+    return `<li class="app-item">
+      <span class="app-num">${i + 1}</span>
+      <div class="app-item-main">
+        <div class="app-item-title">${escapeHtml(it.code)} — ${escapeHtml(it.spName)}</div>
+        <div class="app-item-sub">${codeBadge(it.university_code)} ${escapeHtml(uniName)}${quotaLabel ? ` <span class="app-quota-tag">${escapeHtml(quotaLabel)}</span>` : ""}</div>
+        <div class="app-item-badges">${quotaBadges(it.pBase, it.pRural, it.baseKey, it.ruralKey)}</div>
+      </div>
+      <div class="app-item-actions">
+        <button type="button" class="app-move" data-app-move data-idx="${i}" data-dir="-1" ${i === 0 ? "disabled" : ""} aria-label="${t("app.moveUp")}">↑</button>
+        <button type="button" class="app-move" data-app-move data-idx="${i}" data-dir="1" ${i === items.length - 1 ? "disabled" : ""} aria-label="${t("app.moveDown")}">↓</button>
+        <button type="button" class="app-remove" data-app-remove data-idx="${i}" aria-label="${t("app.remove")}">✕</button>
+      </div>
+    </li>`;
+  }).join("");
+  return `<div class="application-panel">${head}
+    <p class="app-hint">${t("app.priorityHint")}</p>
+    <ol class="app-list">${rows}</ol>
+    <button type="button" class="app-clear" data-app-clear>${t("app.clear")}</button>
+  </div>`;
+}
+
+// Живой % пунктов заявки при ТЕКУЩЕМ балле — считаем напрямую из данных, а не
+// из видимой выдачи: вуз мог выпасть из списка (балл ниже порога допуска) или
+// вообще не быть ни одного прошедшего вуза, но в заявке пункт остаётся, и %
+// всё равно должен отражать текущий балл.
+const RURAL_OF_QUOTA = { general: "rural", ped_quota: "ped_rural", tech_quota: "tech_rural", western_quota: "western_rural", serpin: null };
+function applicationLiveItems(score, rural) {
+  return state.application.map((it) => {
+    const pool = it.quota === "general" ? state.data.paths : state.data.order_quota_paths;
+    const find = (q) => pool.find((p) => p.gop_code === it.code && p.university_code === it.university_code && p.quota_id === q);
+    const baseRow = find(it.quota);
+    const ruralQ = RURAL_OF_QUOTA[it.quota];
+    const ruralRow = rural && ruralQ ? find(ruralQ) : null;
+    return {
+      ...it,
+      pBase: baseRow ? probabilityAt(baseRow.probability_curve, score) : it.pBase,
+      pRural: ruralRow ? probabilityAt(ruralRow.probability_curve, score) : (rural ? it.pRural : null),
+    };
+  });
+}
+function drawApplicationPanelInto(score, rural) {
+  const el = document.getElementById("application-panel");
+  if (!el) return;
+  el.innerHTML = renderApplicationPanel(applicationLiveItems(score, rural));
+}
+
+// Делегированный обработчик кликов заявки. Навешивается на контейнер
+// результатов ОДИН раз (контейнер переживает re-render), а per-render
+// замыкания (draw/drawApplicationPanel/buildAppItem) берутся из resultsClickCtx,
+// который обновляется каждым renderResults — иначе обработчик держал бы
+// устаревший specialtyGroups первого рендера.
+let resultsClickCtx = null;
+function bindResultsClicks(container) {
+  if (container._appBound) return;
+  container._appBound = true;
+  container.addEventListener("click", (e) => {
+    const ctx = resultsClickCtx;
+    if (!ctx) return;
+    const add = e.target.closest("[data-app-add]");
+    if (add) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (add.disabled) return;
+      const { code, uni, quota } = add.dataset;
+      const idx = appIndexOf(code, uni, quota);
+      if (idx >= 0) removeFromApplication(idx);
+      else { const item = ctx.buildAppItem(code, uni, quota); if (item) addToApplication(item); }
+      ctx.draw();
+      ctx.drawApplicationPanel();
+      return;
+    }
+    const mv = e.target.closest("[data-app-move]");
+    if (mv) { moveApplication(+mv.dataset.idx, +mv.dataset.dir); ctx.drawApplicationPanel(); return; }
+    const rm = e.target.closest("[data-app-remove]");
+    if (rm) { removeFromApplication(+rm.dataset.idx); ctx.draw(); ctx.drawApplicationPanel(); return; }
+    if (e.target.closest("[data-app-clear]")) { clearApplication(); ctx.draw(); ctx.drawApplicationPanel(); return; }
+  });
+}
+
 // Универсальная строка вуза внутри раздела квоты (общий/пед/тех/западная/
 // Серпін — каждый раздел рисует свой список этой же функцией с своими
 // baseKey/ruralKey, см. RESULT_QUOTA_POOLS).
-function renderQuotaUniRow(m, baseKey, ruralKey) {
+function renderQuotaUniRow(m, baseKey, ruralKey, specCode = null, quotaKey = null) {
   const uniName = localizedName({ name: m.university_name, name_kk: m.university_name_kk });
   const base = m.base || m.rural;
   const lastYear = base?.data_years ? base.data_years[base.data_years.length - 1] : 2025;
@@ -1143,6 +1368,7 @@ function renderQuotaUniRow(m, baseKey, ruralKey) {
   return `
     <details class="path-card">
       <summary>
+        ${specCode ? appAddButton(specCode, m.university_code, quotaKey) : ""}
         <div class="path-main">
           <div class="path-uni">${codeBadge(m.university_code)} ${escapeHtml(uniName)}</div>
           <div class="path-sub">${lowSample ? `<span class="badge-note">${t("path.lowSample")}</span>` : ""}</div>
@@ -1323,6 +1549,38 @@ function orderQuotaByUniversity(code, baseId, ruralId) {
   });
 }
 
+// Сворачиваемая карточка вуза с историей мин/макс по годам (общий+сельская) —
+// список вузов на карточке специальности длинный, поэтому по умолчанию свёрнут
+// (видно только название вуза), раскрывается по клику. Пустой yearly — карточки
+// вовсе нет (вызывающий фильтрует).
+function uniYearlyDropdown(uniCode, u) {
+  const rows = (u.yearly || []).filter((y) => y.general || y.rural);
+  if (!rows.length) return "";
+  const uniName = escapeHtml(localizedName({ name: u.university_name, name_kk: u.university_name_kk }));
+  return `
+    <details class="path-card uni-history-card">
+      <summary>
+        <span class="uni-history-chevron" aria-hidden="true">▸</span>
+        <span class="path-uni">${codeBadge(uniCode)} ${uniName}</span>
+      </summary>
+      <div class="path-details">
+        <div class="table-scroll">
+          <table class="stat-table yearly-table">
+            <thead>
+              <tr><th rowspan="2">${t("path.year")}</th><th colspan="2" class="th-general">${t("quota.general")}</th><th colspan="2" class="th-rural">${t("quota.rural")}</th></tr>
+              <tr><th>${t("table.min")}</th><th>${t("table.max")}</th><th>${t("table.min")}</th><th>${t("table.max")}</th></tr>
+            </thead>
+            <tbody>
+              ${rows.map((y) => `<tr><td>${y.year}</td><td class="stat-general">${y.general?.min ?? "—"}</td><td class="stat-general">${y.general?.max ?? "—"}</td><td class="stat-rural">${y.rural?.min ?? "—"}</td><td class="stat-rural">${y.rural?.max ?? "—"}</td></tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+        <p><a class="card-link" href="#/universities/${uniCode}">${t("btn.uniCard")}</a></p>
+      </div>
+    </details>
+  `;
+}
+
 function renderSpecialtyDetail(app, code) {
   const { specialties, paths, universities } = state.data;
   const sp = specialties[code];
@@ -1336,48 +1594,59 @@ function renderSpecialtyDetail(app, code) {
   const summaryYearly = (sp.general_grant_summary && sp.general_grant_summary.yearly) || [];
   const pedEntries = orderQuotaByUniversity(code, "ped_quota", "ped_rural");
 
+  // Общий конкурс (и сельская квота) по каждому вузу с историей по годам —
+  // та же группировка, что orderQuotaByUniversity, но по paths (general/rural).
+  const generalEntries = (() => {
+    const byUni = new Map();
+    for (const r of general) byUni.set(r.university_code, { base: r, rural: null });
+    for (const r of rural) {
+      const e = byUni.get(r.university_code) || { base: null, rural: null };
+      e.rural = r;
+      byUni.set(r.university_code, e);
+    }
+    return [...byUni.entries()].map(([uniCode, { base, rural }]) => {
+      const src = base || rural;
+      return [uniCode, {
+        university_name: src.university_name,
+        university_name_kk: src.university_name_kk,
+        yearly: mergePathYearly(base, rural),
+      }];
+    });
+  })();
+
   // Вкладка 1: мин/макс баллы — мин и макс отдельными колонками; общий
   // грант агрегатом (один пул), пед-квота по каждому вузу с годами.
   const scoreYears = summaryYearly.filter((y) => y.general || y.rural);
   const minMaxTab = `
-    <h3>${t("results.generalGrant")}</h3>
-    ${scoreYears.length ? `
-      <div class="table-scroll">
-      <table class="stat-table">
-        <thead>
-          <tr><th rowspan="2">${t("path.year")}</th><th colspan="2" class="th-general">${t("quota.general")}</th><th colspan="2" class="th-rural">${t("quota.rural")}</th></tr>
-          <tr><th>${t("table.min")}</th><th>${t("table.max")}</th><th>${t("table.min")}</th><th>${t("table.max")}</th></tr>
-        </thead>
-        <tbody>
-          ${scoreYears.map((y) => `<tr><td>${y.year}</td><td class="stat-general">${y.general?.min ?? "—"}</td><td class="stat-general">${y.general?.max ?? "—"}</td><td class="stat-rural">${y.rural?.min ?? "—"}</td><td class="stat-rural">${y.rural?.max ?? "—"}</td></tr>`).join("")}
-        </tbody>
-      </table>
-      </div>
-    ` : `<p class="hint">${t("cutoffTable.noData")}</p>`}
+    <div class="grant-pool" data-quota="general">
+      <h3 class="grant-pool-title">${t("results.generalGrant")}</h3>
+      ${scoreYears.length ? `
+        <div class="table-scroll">
+        <table class="stat-table">
+          <thead>
+            <tr><th rowspan="2">${t("path.year")}</th><th colspan="2" class="th-general">${t("quota.general")}</th><th colspan="2" class="th-rural">${t("quota.rural")}</th></tr>
+            <tr><th>${t("table.min")}</th><th>${t("table.max")}</th><th>${t("table.min")}</th><th>${t("table.max")}</th></tr>
+          </thead>
+          <tbody>
+            ${scoreYears.map((y) => `<tr><td>${y.year}</td><td class="stat-general">${y.general?.min ?? "—"}</td><td class="stat-general">${y.general?.max ?? "—"}</td><td class="stat-rural">${y.rural?.min ?? "—"}</td><td class="stat-rural">${y.rural?.max ?? "—"}</td></tr>`).join("")}
+          </tbody>
+        </table>
+        </div>
+      ` : `<p class="hint">${t("cutoffTable.noData")}</p>`}
+      ${generalEntries.some(([, u]) => (u.yearly || []).some((y) => y.general || y.rural)) ? `
+        <p class="uni-history-label">${t("specialtyDetail.byUniLabel")}</p>
+        <div class="uni-stat-list">
+          ${generalEntries.map(([uniCode, u]) => uniYearlyDropdown(uniCode, u)).join("")}
+        </div>
+      ` : ""}
+    </div>
     ${pedEntries.length ? `
-      <h3>${t("results.pedQuota")}</h3>
-      <div class="uni-stat-list">
-        ${pedEntries.map(([uniCode, u]) => {
-          const rows = (u.yearly || []).filter((y) => y.general || y.rural);
-          if (!rows.length) return "";
-          const uniName = escapeHtml(localizedName({ name: u.university_name, name_kk: u.university_name_kk }));
-          return `
-            <div class="path-card uni-stat-card">
-              <div class="path-uni"><a href="#/universities/${uniCode}">${codeBadge(uniCode)}</a> <a href="#/universities/${uniCode}">${uniName}</a></div>
-              <div class="table-scroll">
-                <table class="stat-table yearly-table">
-                  <thead>
-                    <tr><th rowspan="2">${t("path.year")}</th><th colspan="2" class="th-general">${t("quota.general")}</th><th colspan="2" class="th-rural">${t("quota.rural")}</th></tr>
-                    <tr><th>${t("table.min")}</th><th>${t("table.max")}</th><th>${t("table.min")}</th><th>${t("table.max")}</th></tr>
-                  </thead>
-                  <tbody>
-                    ${rows.map((y) => `<tr><td>${y.year}</td><td class="stat-general">${y.general?.min ?? "—"}</td><td class="stat-general">${y.general?.max ?? "—"}</td><td class="stat-rural">${y.rural?.min ?? "—"}</td><td class="stat-rural">${y.rural?.max ?? "—"}</td></tr>`).join("")}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          `;
-        }).join("")}
+      <div class="grant-pool" data-quota="ped_quota">
+        <h3 class="grant-pool-title">${t("results.pedQuota")}</h3>
+        <p class="uni-history-label">${t("specialtyDetail.byUniLabel")}</p>
+        <div class="uni-stat-list">
+          ${pedEntries.map(([uniCode, u]) => uniYearlyDropdown(uniCode, u)).join("")}
+        </div>
       </div>
     ` : ""}
   `;
@@ -1397,34 +1666,38 @@ function renderSpecialtyDetail(app, code) {
   }
   const general2026 = summaryYearly.find((y) => y.year === 2026)?.count;
   const countsTab = `
-    <h3>${t("results.generalGrant")}</h3>
-    ${summaryYearly.some((y) => y.count != null) ? `
-      <div class="table-scroll">
-      <table class="stat-table">
-        <thead><tr><th>${t("path.year")}</th>${countYears.map((y) => `<th>${y}</th>`).join("")}</tr></thead>
-        <tbody><tr><td>${t("results.generalGrant")}</td>${countYears.map((y) => `<td class="stat-count">${summaryYearly.find((e) => e.year === y)?.count ?? "—"}</td>`).join("")}</tr></tbody>
-      </table>
-      </div>
-    ` : `<p class="hint">${t("cutoffTable.noData")}</p>`}
+    <div class="grant-pool" data-quota="general">
+      <h3 class="grant-pool-title">${t("results.generalGrant")}</h3>
+      ${summaryYearly.some((y) => y.count != null) ? `
+        <div class="table-scroll">
+        <table class="stat-table">
+          <thead><tr><th>${t("path.year")}</th>${countYears.map((y) => `<th>${y}</th>`).join("")}</tr></thead>
+          <tbody><tr><td>${t("results.generalGrant")}</td>${countYears.map((y) => `<td class="stat-count">${summaryYearly.find((e) => e.year === y)?.count ?? "—"}</td>`).join("")}</tr></tbody>
+        </table>
+        </div>
+      ` : `<p class="hint">${t("cutoffTable.noData")}</p>`}
+    </div>
     ${pedEntries.length ? `
-      <h3>${t("results.pedQuota")}</h3>
-      <div class="uni-stat-list">
-        ${pedEntries.map(([uniCode, u]) => `
-          <div class="path-card uni-stat-card">
-            <div class="path-uni"><a href="#/universities/${uniCode}">${codeBadge(uniCode)}</a> <a href="#/universities/${uniCode}">${escapeHtml(localizedName({ name: u.university_name, name_kk: u.university_name_kk }))}</a></div>
+      <div class="grant-pool" data-quota="ped_quota">
+        <h3 class="grant-pool-title">${t("results.pedQuota")}</h3>
+        <div class="uni-stat-list">
+          ${pedEntries.map(([uniCode, u]) => `
+            <div class="path-card uni-stat-card">
+              <div class="path-uni"><a href="#/universities/${uniCode}">${codeBadge(uniCode)}</a> <a href="#/universities/${uniCode}">${escapeHtml(localizedName({ name: u.university_name, name_kk: u.university_name_kk }))}</a></div>
+              <div class="uni-year-stats">
+                ${countYears.map((y) => `<div><b>${(u.yearly || []).find((e) => e.year === y)?.count ?? "—"}</b><span>${y}</span></div>`).join("")}
+              </div>
+            </div>
+          `).join("")}
+          <div class="path-card uni-stat-card total-card">
+            <div class="path-uni">${t("table.total")}</div>
             <div class="uni-year-stats">
-              ${countYears.map((y) => `<div><b>${(u.yearly || []).find((e) => e.year === y)?.count ?? "—"}</b><span>${y}</span></div>`).join("")}
+              ${countYears.map((y) => `<div><b>${pedTotals[y] ?? "—"}</b><span>${y}</span></div>`).join("")}
             </div>
           </div>
-        `).join("")}
-        <div class="path-card uni-stat-card total-card">
-          <div class="path-uni">${t("table.total")}</div>
-          <div class="uni-year-stats">
-            ${countYears.map((y) => `<div><b>${pedTotals[y] ?? "—"}</b><span>${y}</span></div>`).join("")}
-          </div>
         </div>
+        ${general2026 != null ? `<p class="hint">${t("specialtyDetail.totalNote", { g: general2026, p: pedTotals[2026] ?? 0, total: general2026 + (pedTotals[2026] ?? 0) })}</p>` : ""}
       </div>
-      ${general2026 != null ? `<p class="hint">${t("specialtyDetail.totalNote", { g: general2026, p: pedTotals[2026] ?? 0, total: general2026 + (pedTotals[2026] ?? 0) })}</p>` : ""}
     ` : ""}
   `;
 
@@ -1821,6 +2094,9 @@ async function init() {
   applyStaticI18n();
   document.getElementById("app").innerHTML = `<p class="lede">Загрузка данных...</p>`;
   state.data = await loadData();
+  const loadedApp = loadApplication();
+  state.application = loadedApp.items;
+  state.applicationCombo = loadedApp.combo;
   SUBJECT_COMBO_KK_BY_KEY = buildSubjectComboKkIndex(state.data.specialties);
   setupLanguageToggle();
   window.addEventListener("hashchange", render);

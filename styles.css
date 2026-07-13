@@ -860,3 +860,121 @@ a:hover .code-badge { background: var(--brand); color: #fff; }
   .cp-bar-label { font-size: 0.58rem; transform: rotate(-45deg); transform-origin: top left; }
   .cp-histogram { height: 170px; }
 }
+
+/* ---------- "Моя заявка" (список приоритетов) ---------- */
+.app-add-btn {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid var(--brand);
+  background: var(--bg);
+  color: var(--brand);
+  font-size: 1.15rem;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.app-add-btn:hover { background: var(--brand); color: #fff; }
+.app-add-btn.added { background: var(--brand); color: #fff; }
+.app-add-btn.blocked { border-color: var(--border); color: var(--text-muted); cursor: not-allowed; opacity: 0.55; }
+.app-add-btn.blocked:hover { background: var(--bg); color: var(--text-muted); }
+
+.application-panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--brand);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin: 0 0 22px;
+  box-shadow: 0 6px 20px rgba(30, 15, 25, 0.05);
+}
+:root[data-theme="dark"] .application-panel { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); }
+.application-panel.is-empty { border-left-color: var(--border); }
+
+.app-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.app-title { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; color: var(--text-heading); }
+.app-count { font-weight: 700; color: var(--brand); font-size: 0.95rem; }
+.app-empty { color: var(--text-muted); font-size: 0.88rem; margin-top: 8px; }
+.app-hint { color: var(--text-muted); font-size: 0.8rem; margin: 6px 0 12px; }
+
+.app-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.app-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.app-num {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--brand-light);
+  color: var(--brand-dark);
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+:root[data-theme="dark"] .app-num { color: #fff; }
+.app-item-main { flex: 1 1 auto; min-width: 0; }
+.app-item-title { font-weight: 600; color: var(--text-heading); font-size: 0.92rem; }
+.app-item-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.app-quota-tag { font-size: 0.72rem; background: var(--brand-light); color: var(--brand-dark); padding: 1px 7px; border-radius: 999px; }
+:root[data-theme="dark"] .app-quota-tag { color: #fff; }
+.app-item-badges { margin-top: 6px; }
+.app-item-actions { flex: 0 0 auto; display: flex; gap: 4px; }
+.app-move, .app-remove {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.app-move:hover:not(:disabled), .app-remove:hover { border-color: var(--brand); color: var(--brand); }
+.app-move:disabled { opacity: 0.35; cursor: default; }
+.app-clear {
+  margin-top: 12px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.83rem;
+}
+.app-clear:hover { border-color: var(--brand); color: var(--brand); }
+
+/* ---------- История по вузам на карточке специальности (сворачиваемая) ---------- */
+.uni-history-label { font-size: 0.82rem; color: var(--text-muted); margin: 14px 0 8px; }
+.uni-history-card > summary {
+  justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+.uni-history-card > summary .path-uni { flex: 1 1 auto; min-width: 0; }
+.uni-history-chevron {
+  flex: 0 0 auto;
+  color: var(--pool-color, var(--brand));
+  font-size: 0.9rem;
+  transition: transform 0.15s;
+}
+.uni-history-card[open] > summary .uni-history-chevron { transform: rotate(90deg); }
+.uni-history-card .path-details { padding-top: 4px; }
