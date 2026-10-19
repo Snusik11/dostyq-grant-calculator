@@ -2,84 +2,86 @@
     <img src="assets/logo.webp" alt="Dostyq Online" title="Dostyq Online" align="right" height="60" />
 </a>
 
-# Калькулятор шансов на грант
+# Grant Chance Calculator
 
-[![Демо](https://img.shields.io/badge/демо-онлайн-c2308f)](https://snusik11.github.io/dostyq-grant-calculator/)
-[![GitHub Pages](https://img.shields.io/badge/хостинг-GitHub%20Pages-222)](https://snusik11.github.io/dostyq-grant-calculator/)
-![Vanilla JS](https://img.shields.io/badge/стек-HTML%20%2B%20CSS%20%2B%20JS-f7df1e)
-![Без сборки](https://img.shields.io/badge/сборка-не%20нужна-success)
-![Языки](https://img.shields.io/badge/язык-RU%20%2F%20ҚАЗ-blue)
+[![Live demo](https://img.shields.io/badge/demo-online-c2308f)](https://snusik11.github.io/dostyq-grant-calculator/)
+[![GitHub Pages](https://img.shields.io/badge/hosting-GitHub%20Pages-222)](https://snusik11.github.io/dostyq-grant-calculator/)
+![Vanilla JS](https://img.shields.io/badge/stack-HTML%20%2B%20CSS%20%2B%20JS-f7df1e)
+![No build step](https://img.shields.io/badge/build-none-success)
+![Languages](https://img.shields.io/badge/UI-RU%20%2F%20KK-blue)
 
-:star: Поставь звезду на GitHub, нам это очень помогает!
+:star: Star us on GitHub, it motivates us a lot!
 
-**Калькулятор шансов на грант** от [DOSTYQ ONLINE](https://snusik11.github.io/dostyq-grant-calculator/) показывает абитуриенту Казахстана, насколько реально получить государственный образовательный грант в 2026–2027 учебном году. Введи комбинацию профильных предметов и балл ЕНТ, отметь свои квоты и получи шанс в процентах по каждой специальности и каждому вузу.
+The **Grant Chance Calculator** by [DOSTYQ ONLINE](https://snusik11.github.io/dostyq-grant-calculator/) shows Kazakhstan university applicants how likely they are to win a state educational grant for the 2026–2027 academic year. Pick your profile subject pair, enter your total UNT (ЕНТ) score, tick the quotas you qualify for, and get a chance in percent for every specialty and every university.
 
-Это статический сайт: без сервера, без базы данных и без сборки. Все данные лежат рядом в JSON, поэтому он работает на обычном GitHub Pages.
+It is a static site: no server, no database, no build step. All data ships next to the page as JSON, so it runs on plain GitHub Pages.
 
-> Оценка — эвристика, а не гарантия поступления. Используй её как ориентир.
+> The estimate is a heuristic, not a guarantee of admission. Use it as a guide.
 
-[![Калькулятор шансов на грант](docs/screenshots/02-results.png)](https://snusik11.github.io/dostyq-grant-calculator/)
+> The interface is in Russian and Kazakh (switchable in the header), so the screenshots below show the Russian UI.
 
-## Оглавление
+[![Grant Chance Calculator](docs/screenshots/02-results.png)](https://snusik11.github.io/dostyq-grant-calculator/)
 
-- [Возможности](#возможности)
-- [Скриншоты](#скриншоты)
-- [Быстрый старт](#быстрый-старт)
-- [Структура проекта](#структура-проекта)
-- [Как считается шанс](#как-считается-шанс)
-    - [Ограничения модели](#ограничения-модели)
-- [Источники данных](#источники-данных)
-- [Обновление данных](#обновление-данных)
-- [Деплой](#деплой)
+## Table Of Contents
 
-## Возможности
+- [Features](#features)
+- [Screenshots](#screenshots)
+- [Quick start](#quick-start)
+- [Project structure](#project-structure)
+- [How the chance is calculated](#how-the-chance-is-calculated)
+    - [Model limitations](#model-limitations)
+- [Data sources](#data-sources)
+- [Updating the data](#updating-the-data)
+- [Deployment](#deployment)
 
-| Раздел | Маршрут | Что внутри |
+## Features
+
+| Section | Route | What it shows |
 |---|---|---|
-| Калькулятор | `#/` | Комбинация предметов, балл ЕНТ и квоты → список специальностей и вузов с шансом в процентах |
-| Специальности | `#/specialties`, `#/specialties/{код}` | Каталог ГОП, карточка с мин/макс баллами по годам, числом грантов и вузами |
-| Вузы | `#/universities`, `#/universities/{код}` | Каталог вузов (регион, общежитие, военная кафедра), карточка вуза со всеми специальностями и проходными баллами |
+| Calculator | `#/` | Subject pair, UNT score and quotas → a list of specialties and universities with a chance in percent |
+| Specialties | `#/specialties`, `#/specialties/{code}` | Catalog of specialties (GOP codes); a detail page with min/max scores by year, number of grants and universities |
+| Universities | `#/universities`, `#/universities/{code}` | Catalog of universities (region, dormitory, military department); a detail page with all specialties and their passing scores |
 
-Что умеет калькулятор:
+What the calculator does:
 
-- **Шанс в процентах** для каждой пары «специальность × вуз» с ярлыком: высокий (≥ 70%), средний (≥ 35%), низкий.
-- **Фильтр по порогу допуска.** Вуз показывается, только если балл не ниже порога допуска к конкурсу 2026.
-- **Квоты:** общий конкурс, сельская квота, педагогическая, техническая и сельскохозяйственная, западный регион, «Серпін». Групповые квоты (сироты, многодетные, инвалидность и другие) оцениваются по группе специальностей, а не по одному вузу.
-- **Панель конкуренции.** Сколько сдающих по твоей комбинации набрали твой балл и выше, как это изменилось с 2025 года и какой у тебя перцентиль (данные ҰТО).
-- **«Моя заявка».** Список до 4 приоритетов, как в реальной заявке. Хранится в браузере.
-- **Два языка:** русский и казахский.
-- **Светлая и тёмная темы**, адаптивная вёрстка вплоть до 375 px.
+- **Chance in percent** for every specialty × university pair, with a label: high (≥ 70%), medium (≥ 35%) or low.
+- **Admission threshold filter.** A university is shown only if your score reaches its 2026 threshold for the competition.
+- **Quotas:** general competition, rural quota, pedagogical quota, technical and agricultural state order, Western regions quota and the "Serpin" programme. Group quotas (orphans, large families, disability and others) are estimated for a whole group of specialties rather than a single university.
+- **Competition panel.** How many test takers in your subject pair scored your score or higher, how that changed since 2025, and your percentile (National Testing Center data).
+- **"My application".** A list of up to 4 priorities, like a real application. Stored in the browser.
+- **Two languages:** Russian and Kazakh.
+- **Light and dark themes** and a responsive layout down to 375 px.
 
-## Скриншоты
+## Screenshots
 
-### Ввод данных
+### Entering your data
 
-[![Форма калькулятора](docs/screenshots/01-calculator.png)](docs/screenshots/01-calculator.png)
+[![Calculator form](docs/screenshots/01-calculator.png)](docs/screenshots/01-calculator.png)
 
-Три шага: профильные предметы, суммарный балл ЕНТ, квоты.
+Three steps: profile subjects, total UNT score, quotas.
 
-### Результаты
+### Results
 
-[![Карточки специальностей с вузами](docs/screenshots/03-specialty-cards.png)](docs/screenshots/03-specialty-cards.png)
+[![Specialty cards with universities](docs/screenshots/03-specialty-cards.png)](docs/screenshots/03-specialty-cards.png)
 
-Каждая специальность раскрывается в список вузов с шансом, пометкой квоты и значком «мало данных», если победителей в прошлом году было мало.
+Each specialty expands into a list of universities with the chance, the quota badge, and a "low data" badge when there were few winners last year.
 
-### Карточка специальности и карточка вуза
+### Specialty page and university page
 
-| Специальность | Вуз |
+| Specialty | University |
 |---|---|
-| [![Карточка специальности](docs/screenshots/04-specialty.png)](docs/screenshots/04-specialty.png) | [![Карточка вуза](docs/screenshots/05-university.png)](docs/screenshots/05-university.png) |
-| Мин/макс баллы по годам, число грантов, список вузов | Регион, общежитие, военная кафедра, проходные баллы по специальностям |
+| [![Specialty page](docs/screenshots/04-specialty.png)](docs/screenshots/04-specialty.png) | [![University page](docs/screenshots/05-university.png)](docs/screenshots/05-university.png) |
+| Min/max scores by year, number of grants, list of universities | Region, dormitory, military department, passing scores by specialty |
 
-### Мобильная версия и тёмная тема
+### Mobile and dark theme
 
 <p align="center">
-  <img src="docs/screenshots/06-mobile-dark.png" alt="Мобильная версия в тёмной теме" width="320" />
+  <img src="docs/screenshots/06-mobile-dark.png" alt="Mobile layout in the dark theme" width="320" />
 </p>
 
-## Быстрый старт
+## Quick start
 
-Нужен любой статический сервер. Открывать `index.html` двойным кликом нельзя: браузер заблокирует загрузку `data/*.json` через `file://`.
+Any static file server will do. Opening `index.html` by double click will not work: the browser blocks loading `data/*.json` over `file://`.
 
 ```bash
 git clone https://github.com/Snusik11/dostyq-grant-calculator.git
@@ -87,108 +89,108 @@ cd dostyq-grant-calculator
 python3 -m http.server 8000
 ```
 
-После этого открой http://localhost:8000.
+Then open http://localhost:8000.
 
-## Структура проекта
+## Project structure
 
-Без фреймворков и без бэкенда: чистые HTML, CSS и JavaScript. Роутинг построен на хэше (`#/...`), поэтому ничего не нужно настраивать на сервере.
+No frameworks and no backend: plain HTML, CSS and JavaScript. Routing is hash-based (`#/...`), so nothing needs to be configured on the server.
 
 ```
 .
-├── index.html              # точка входа, шапка, подключение скриптов
-├── app.js                  # роутер, рендер страниц, i18n (RU/KK), «Моя заявка»
-├── styles.css              # стили, темы, адаптив
+├── index.html              # entry point, header, script includes
+├── app.js                  # router, page rendering, i18n (RU/KK), "My application"
+├── styles.css              # styles, themes, responsive layout
 ├── assets/
 │   └── logo.webp
 ├── docs/
-│   └── screenshots/        # картинки для README
-└── data/                   # готовый датасет (генерируется, руками не правится)
-    ├── specialties.json              # ГОП: названия RU/KK, комбинации предметов, число грантов
-    ├── universities.json             # вузы: регион, общежитие, воен. кафедра, пороги допуска
-    ├── paths.json                    # специальность × вуз: общий конкурс и сельская квота
-    ├── order_quota_paths.json        # пед-, тех-, западная квоты и «Серпін»
-    ├── group_paths.json              # групповые квоты (сироты, многодетные и т. д.)
-    ├── ped_quota_info.json           # справка по педагогической квоте
-    ├── rural_quota_specialties.json  # специальности, где есть сельская квота
-    └── ent_distribution.json         # распределение баллов ЕНТ по комбинациям предметов
+│   └── screenshots/        # images for this README
+└── data/                   # the generated dataset (do not edit by hand)
+    ├── specialties.json              # specialties: RU/KK names, subject pairs, grant counts
+    ├── universities.json             # universities: region, dormitory, military dept., thresholds
+    ├── paths.json                    # specialty × university: general competition and rural quota
+    ├── order_quota_paths.json        # pedagogical, technical, Western quotas and "Serpin"
+    ├── group_paths.json              # group quotas (orphans, large families, etc.)
+    ├── ped_quota_info.json           # pedagogical quota reference
+    ├── rural_quota_specialties.json  # specialties that have a rural quota
+    └── ent_distribution.json         # UNT score distribution by subject pair
 ```
 
-Состояние в браузере (`localStorage`):
+Browser state (`localStorage`):
 
-| Ключ | Что хранит |
+| Key | What it stores |
 |---|---|
-| `lang` | Язык интерфейса (`ru` / `kk`) |
-| `theme` | Тема (`light` / `dark`), по умолчанию светлая |
-| `dostyq_application` | Содержимое «Моей заявки» |
+| `lang` | Interface language (`ru` / `kk`) |
+| `theme` | Theme (`light` / `dark`), light by default |
+| `dostyq_application` | Contents of "My application" |
 
-## Как считается шанс
+## How the chance is calculated
 
-Фронтенд формулу не считает. Для каждого пути в `data/*.json` лежит готовый массив `probability_curve`, индекс которого равен баллу ЕНТ (0…140). Сайт берёт значение по индексу.
+The frontend does not compute the formula. Every path in `data/*.json` carries a precomputed `probability_curve` array, indexed by UNT score (0…140). The site just reads the value at your score.
 
-Кривую строит Python-сборщик датасета по такой схеме:
+The curve is built by a Python dataset builder, following this scheme:
 
 ```
- история баллов победителей 2023–2025
+ winners' scores history 2023–2025
             │
             ▼
-   проходной балл за год (минимум победителя)
+   yearly passing score (the lowest winner's score)
             │
             ▼
-   тренд по годам (нужно ≥ 3 года, иначе тренд = 0)
+   trend over the years (needs ≥ 3 years, otherwise trend = 0)
             │
-            ├── поправка на изменение числа грантов 2025 → 2026
-            ├── поправка на давление сильных абитуриентов комбинации
+            ├── adjustment for the change in grant count 2025 → 2026
+            ├── adjustment for pressure from strong applicants in the subject pair
             ▼
-   прогнозный проходной балл на 2026
-            │
-            ▼
-   p = 1 / (1 + exp(−k · (твой_балл − прогноз)))
+   forecast passing score for 2026
             │
             ▼
-   выравнивание: шанс не растёт с ростом порога допуска внутри специальности
+   p = 1 / (1 + exp(−k · (your_score − forecast)))
+            │
+            ▼
+   smoothing: within a specialty, the chance never grows as the admission threshold grows
 ```
 
-- При балле ровно на прогнозном пороге шанс около 50%.
-- Крутизна `k` растёт с плотностью победителей у порога и падает с волатильностью истории.
-- Для сельской квоты прогноз не может быть выше общего конкурса.
-- Если победителей в последнем году меньше 5, у пути стоит пометка «мало данных».
+- At a score exactly equal to the forecast, the chance is about 50%.
+- The steepness `k` grows with the density of winners near the threshold and shrinks with the volatility of the history.
+- For the rural quota, the forecast cannot be higher than for the general competition.
+- If the latest year had fewer than 5 winners, the path is marked "low data".
 
-### Ограничения модели
+### Model limitations
 
-- Якорь модели — **минимальный** балл победителя за год. Один победитель с низким баллом (например, льготник) может занизить прогноз.
-- Порог допуска (фильтр вузов) и история победителей (вероятность) берутся из разных источников и между собой не сверяются.
-- Для медицинских вузов (госзаказ Минздрава) нет истории победителей, есть только пороги.
-- Пары «специальность × вуз», которые вуз по актуальным данным больше не набирает, исключены из выдачи.
+- The model is anchored on the **lowest** winner's score of each year. A single winner with a low score (for example, someone with a privilege) can pull the forecast down.
+- The admission threshold (which filters universities) and the winners' history (which drives the probability) come from different sources and are not cross-checked against each other.
+- Medical universities (Ministry of Health state order) have no winners' history, only thresholds.
+- Specialty × university pairs that a university no longer admits to according to current data are excluded.
 
-## Источники данных
+## Data sources
 
-| Источник | Что даёт |
+| Source | What it provides |
 |---|---|
-| Списки обладателей гранта 2023, 2024, 2025 (PDF) | Баллы победителей — основа истории и вероятности |
-| Пороговые баллы вузов 2026 (xlsx) | Порог допуска к конкурсу, по нему фильтруются вузы |
-| Число грантов 2024–2025 и 2026–2027 (xls/docx) | Число мест, поправка на изменение конкурса |
-| Соответствие комбинаций профильных предметов (xlsx, 2024) | Пары предметов для специальностей, названия RU/KK |
-| Распределение баллов ЕНТ по комбинациям (ҰТО, 2025–2026) | Панель конкуренции |
-| testcenter.kz | Квоты: техническая и сельскохозяйственная, «Серпін» |
-| eduser.app, edutest.kz | Регионы, общежития, воен. кафедры, казахские названия, пед-квота и недостающие годы |
+| Grant winner lists 2023, 2024, 2025 (PDF) | Winners' scores, the basis of the history and the probability |
+| University threshold scores 2026 (xlsx) | Admission threshold for the competition, used to filter universities |
+| Grant counts 2024–2025 and 2026–2027 (xls/docx) | Number of places, adjustment for the change in competition |
+| Profile subject pair mapping (xlsx, 2024) | Subject pairs per specialty, RU/KK names |
+| UNT score distribution by subject pair (National Testing Center, 2025–2026) | Competition panel |
+| testcenter.kz | Quotas: technical and agricultural, "Serpin" |
+| eduser.app, edutest.kz | Regions, dormitories, military departments, Kazakh names, pedagogical quota and missing years |
 
-В публичный датасет попадают только агрегаты (проходной, минимум, максимум, медиана, число победителей). ФИО и ИКТ победителей наружу не выходят, сборщик проверяет это перед выгрузкой.
+Only aggregates (passing score, min, max, median, number of winners) go into the public dataset. Winners' names and personal IDs never leave the builder, which checks for this before export.
 
-## Обновление данных
+## Updating the data
 
-Сборщик датасета (Python) в этот репозиторий не входит. Он читает исходные PDF, xls и xlsx, склеивает их, считает кривые вероятности и записывает 8 JSON-файлов, которые копируются в `data/`.
+The dataset builder (Python) is not part of this repository. It reads the source PDF, xls and xlsx files, merges them, computes the probability curves and writes 8 JSON files, which are then copied into `data/`.
 
-Для его запуска нужны Python 3 и пакеты:
+To run it you need Python 3 and these packages:
 
 ```bash
 pip install pymupdf pandas lxml openpyxl python-docx rapidfuzz requests selenium
 python3 build_dataset.py
 ```
 
-Скрейперы (testcenter.kz, eduser.app, edutest.kz) работают через Selenium, поэтому нужен Chrome.
+The scrapers (testcenter.kz, eduser.app, edutest.kz) use Selenium, so Chrome is required.
 
-После пересборки новые файлы кладутся в `data/` и коммитятся вместе с кодом сайта.
+After a rebuild, the new files are placed in `data/` and committed together with the site code.
 
-## Деплой
+## Deployment
 
-Сайт публикуется через GitHub Pages из ветки `main`, корень репозитория. Пуш в `main` запускает пересборку.
+The site is published with GitHub Pages from the `main` branch, repository root. A push to `main` triggers a rebuild.
